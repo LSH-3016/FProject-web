@@ -40,7 +40,7 @@ const LandingOverlay = ({ onStart }: LandingOverlayProps) => {
         {/* Subtitle */}
         <motion.p
           className="font-serif text-lg md:text-xl mb-12"
-          style={{ color: 'hsl(35 25% 60%)' }}
+          style={{ color: 'hsla(42, 16%, 88%, 1.00)' }}
           initial={{ y: 20, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           transition={{ duration: 0.8, delay: 0.8 }}
