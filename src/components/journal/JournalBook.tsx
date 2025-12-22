@@ -61,7 +61,7 @@ export const JournalBook = () => {
         {entries.length > 0 && (
           <div 
             ref={entriesContainerRef}
-            className="space-y-3 mb-6 max-h-[300px] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-muted"
+            className="space-y-3 mb-6 max-h-[250px] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-muted"
           >
             {entries.map((entry, idx) => (
               <div 
