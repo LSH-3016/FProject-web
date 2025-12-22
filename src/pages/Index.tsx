@@ -21,7 +21,7 @@ const Index = () => {
              w-full: 부모 너비 100% 차지
              flex justify-center: 내부의 JournalBook(max-w-7xl)을 화면 중앙에 배치
         */}
-        <div className="w-full flex justify-center">
+        <div className="w-full flex justify-center animate-fade-in">
           <JournalBook />
         </div>
 

@@ -18,7 +18,7 @@ const topMenuItems: MenuItem[] = [
   { id: "library", label: "라이브러리", icon: Library, path: "/library" },
 ];
 
-const authItem: MenuItem = { id: "auth", label: "로그인 / 가입", icon: LogIn, path: "/auth" };
+const authItem: MenuItem = { id: "auth", label: "로그인 / 회원가입", icon: LogIn, path: "/auth" };
 
 const bottomRowItems: MenuItem[] = [
   { id: "mypage", label: "마이페이지", icon: User, path: "/mypage" },
@@ -138,8 +138,8 @@ export function LibrarySidebar({ isOpen, onClose, onToggle }: LibrarySidebarProp
             className={cn(
               "bookmark w-10 h-24 rounded-r-md flex items-center justify-center transition-all duration-300 shadow-md",
               isOpen 
-                ? "bg-leather border-l border-gold" 
-                : "bg-background border border-l-0 border-border group-hover:bg-accent"
+                ? "bg-[hsl(var(--bookmark))] border-l border-gold" 
+                : "bg-[hsl(var(--bookmark))] border border-l-0 border-border group-hover:bg-accent"
             )}
           >
             <div className="absolute bottom-0 left-0 right-0 h-4 overflow-hidden">
