@@ -37,53 +37,71 @@ const IntroMessage = ({ onComplete }: IntroMessageProps) => {
 
           {/* Parchment message */}
           <motion.div
-            className="relative parchment max-w-lg mx-8 p-12 text-center"
+            className="relative max-w-lg mx-8 p-12 text-center"
             initial={{ scale: 0.9, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0.95, opacity: 0 }}
             transition={{ duration: 0.6, delay: 0.2 }}
+            style={{
+              background: 'hsl(40 30% 92%)',
+              borderRadius: '6px',
+              boxShadow: `
+                0 12px 28px hsl(25 40% 10% / 0.45),
+                0 0 0 1px hsl(38 30% 80% / 0.6),
+                inset 0 1px 0 hsl(40 60% 96% / 0.6)
+              `,
+            }}
           >
             {/* Decorative corner flourishes */}
             <div
-              className="absolute top-4 left-4 w-8 h-8 opacity-30"
+              className="absolute top-4 left-4 w-8 h-8 opacity-35"
               style={{
-                borderTop: '2px solid hsl(var(--ink))',
-                borderLeft: '2px solid hsl(var(--ink))',
+                borderTop: '2px solid hsl(35 25% 55%)',
+                borderLeft: '2px solid hsl(35 25% 55%)',
               }}
             />
             <div
-              className="absolute top-4 right-4 w-8 h-8 opacity-30"
+              className="absolute top-4 right-4 w-8 h-8 opacity-35"
               style={{
-                borderTop: '2px solid hsl(var(--ink))',
-                borderRight: '2px solid hsl(var(--ink))',
+                borderTop: '2px solid hsl(35 25% 55%)',
+                borderRight: '2px solid hsl(35 25% 55%)',
               }}
             />
             <div
-              className="absolute bottom-4 left-4 w-8 h-8 opacity-30"
+              className="absolute bottom-4 left-4 w-8 h-8 opacity-35"
               style={{
-                borderBottom: '2px solid hsl(var(--ink))',
-                borderLeft: '2px solid hsl(var(--ink))',
+                borderBottom: '2px solid hsl(35 25% 55%)',
+                borderLeft: '2px solid hsl(35 25% 55%)',
               }}
             />
             <div
-              className="absolute bottom-4 right-4 w-8 h-8 opacity-30"
+              className="absolute bottom-4 right-4 w-8 h-8 opacity-35"
               style={{
-                borderBottom: '2px solid hsl(var(--ink))',
-                borderRight: '2px solid hsl(var(--ink))',
+                borderBottom: '2px solid hsl(35 25% 55%)',
+                borderRight: '2px solid hsl(35 25% 55%)',
               }}
             />
 
             {/* Message text */}
             <motion.p
-              className="font-serif text-xl md:text-2xl leading-relaxed text-ink mb-4"
+              className="font-serif text-xl md:text-2xl leading-relaxed mb-4"
+              style={{
+                color: 'hsl(32 35% 42%)',
+                textShadow: '0 1px 2px hsl(30 30% 20% / 0.25)',
+              }}
               initial={{ y: 10, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               transition={{ duration: 0.6, delay: 0.5 }}
             >
               여기는 내 기억의 도서관입니다.
             </motion.p>
+
             <motion.p
-              className="font-serif text-lg md:text-xl leading-relaxed text-ink/70"
+              className="font-serif text-lg md:text-xl leading-relaxed"
+              style={{
+                color: 'hsl(34 25% 48%)',
+                textShadow: '0 1px 1px hsl(30 25% 18% / 0.2)',
+              }}
               initial={{ y: 10, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               transition={{ duration: 0.6, delay: 0.8 }}
