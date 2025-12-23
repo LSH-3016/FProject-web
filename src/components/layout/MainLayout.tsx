@@ -3,9 +3,10 @@ import { LibrarySidebar } from "./LibrarySidebar";
 
 interface MainLayoutProps {
   children: React.ReactNode;
+  showSidebar?: boolean;
 }
 
-export function MainLayout({ children }: MainLayoutProps) {
+export function MainLayout({ children, showSidebar = true }: MainLayoutProps) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   // 토글 함수
@@ -23,11 +24,13 @@ export function MainLayout({ children }: MainLayoutProps) {
       </div>
 
       {/* Sidebar (버튼 포함됨) */}
-      <LibrarySidebar
-        isOpen={isSidebarOpen}
-        onClose={() => setIsSidebarOpen(false)}
-        onToggle={toggleSidebar}
-      />
+      {showSidebar && (
+        <LibrarySidebar 
+          isOpen={isSidebarOpen}
+          onClose={() => setIsSidebarOpen(false)}
+          onToggle={() => setIsSidebarOpen(!isSidebarOpen)}
+        />
+      )}
 
       {/* Main Content */}
       <main className="relative min-h-screen w-full flex flex-col">

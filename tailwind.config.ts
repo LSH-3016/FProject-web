@@ -73,6 +73,13 @@ export default {
         serif: ["'Nanum Myeongjo'", "serif"],
         handwriting: ["'Nanum Pen Script'", "cursive"],
       },
+      fontSize:{
+        'handwriting-sm': ['calc(0.875rem + 0.5px)', '1.25'],
+        'handwriting-base': ['calc(1rem + 0.5px)', '1.5'],
+        'handwriting-lg': ['calc(1.125rem + 0.5px)', '1.75'],
+        'handwriting-xl': ['calc(1.25rem + 0.5px)', '1.75'],
+        'handwriting-2xl': ['calc(1.5rem + 0.5px)', '2'],
+      },
       borderRadius: {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",

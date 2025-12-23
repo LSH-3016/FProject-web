@@ -12,6 +12,7 @@ import Auth from "./pages/Auth";
 import History from "./pages/History";
 import LibraryPage from "./pages/LibraryPage";
 import MyPage from "./pages/MyPage";
+import EditProfile from "./pages/EditProfile";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 
@@ -35,6 +36,7 @@ const App = () => (
           <Route path="/history" element={<History />} />
           <Route path="/library" element={<LibraryPage />} />
           <Route path="/mypage" element={<MyPage />} />
+          <Route path="/edit-profile" element={<EditProfile />} />          
           <Route path="/settings" element={<Settings />} />
           <Route path="*" element={<NotFound />} />
         </Routes>

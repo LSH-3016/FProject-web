@@ -1,5 +1,6 @@
 import type React from "react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { MainLayout } from "@/components/layout/MainLayout";
 import {
   User,
@@ -93,7 +94,130 @@ const allAchievements = [
 ];
 
 const MyPage = () => {
+  const navigate = useNavigate();
   const [isAchievementsOpen, setIsAchievementsOpen] = useState(false);
+  const [isWithdrawOpen, setIsWithdrawOpen] = useState(false);
+  const [isWithdrawAgreed, setIsWithdrawAgreed] = useState(false);
+  const [isWithdrawCompleteOpen, setIsWithdrawCompleteOpen] = useState(false);
+  const [isLogoutConfirmOpen, setIsLogoutConfirmOpen] = useState(false);
+  const [isLogoutCompleteOpen, setIsLogoutCompleteOpen] = useState(false);
+  const [isReportOpen, setIsReportOpen] = useState(false);
+  const [isReportCompleteOpen, setIsReportCompleteOpen] = useState(false);
+  const [isInquiryOpen, setIsInquiryOpen] = useState(false);
+  const [isInquiryCompleteOpen, setIsInquiryCompleteOpen] = useState(false);
+  const [isAssistantOpen, setIsAssistantOpen] = useState(false);
+  const [assistantMessages, setAssistantMessages] = useState<
+    Array<{ id: number; role: "user" | "assistant"; text: string }>
+  >([
+    {
+      id: 1,
+      role: "assistant",
+      text: "안녕하세요! 궁금한 내용을 입력해 주세요.",
+    },
+  ]);
+  const [assistantInput, setAssistantInput] = useState("");
+  const assistantScrollRef = useRef<HTMLDivElement | null>(null);
+  const defaultNickname = "상호상사";
+  const storedProfileImage =
+    typeof window !== "undefined" ? localStorage.getItem("profileImage") : null;
+  const storedNickname =
+    typeof window !== "undefined"
+      ? localStorage.getItem("profileNickname")
+      : null;
+  const profileImage = storedProfileImage ?? "";
+  const profileNickname = storedNickname ?? defaultNickname;
+
+  const closeWithdrawModal = () => {
+    setIsWithdrawOpen(false);
+    setIsWithdrawAgreed(false);
+  };
+
+  const handleWithdrawConfirm = () => {
+    setIsWithdrawOpen(false);
+    setIsWithdrawAgreed(false);
+    setIsWithdrawCompleteOpen(true);
+  };
+
+  const closeWithdrawCompleteModal = () => {
+    setIsWithdrawCompleteOpen(false);
+  };
+
+  const openLogoutConfirm = () => {
+    setIsLogoutConfirmOpen(true);
+  };
+
+  const closeLogoutConfirm = () => {
+    setIsLogoutConfirmOpen(false);
+  };
+
+  const handleLogoutConfirm = () => {
+    setIsLogoutConfirmOpen(false);
+    setIsLogoutCompleteOpen(true);
+  };
+
+  const closeLogoutComplete = () => {
+    setIsLogoutCompleteOpen(false);
+  };
+
+  const closeReportModal = () => {
+    setIsReportOpen(false);
+  };
+
+  const handleReportSubmit = () => {
+    setIsReportOpen(false);
+    setIsReportCompleteOpen(true);
+  };
+
+  const closeReportComplete = () => {
+    setIsReportCompleteOpen(false);
+  };
+
+  const closeInquiryModal = () => {
+    setIsInquiryOpen(false);
+  };
+
+  const handleInquirySubmit = () => {
+    setIsInquiryOpen(false);
+    setIsInquiryCompleteOpen(true);
+  };
+
+  const closeInquiryComplete = () => {
+    setIsInquiryCompleteOpen(false);
+  };
+
+  const toggleAssistant = () => {
+    setIsAssistantOpen((prev) => !prev);
+  };
+
+  const handleAssistantSend = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const trimmed = assistantInput.trim();
+    if (!trimmed) {
+      return;
+    }
+    const userMessage = {
+      id: Date.now(),
+      role: "user" as const,
+      text: trimmed,
+    };
+    const replyMessage = {
+      id: Date.now() + 1,
+      role: "assistant" as const,
+      text: "현재는 데모 모드라 자동 응답만 제공됩니다.",
+    };
+    setAssistantMessages((prev) => [...prev, userMessage, replyMessage]);
+    setAssistantInput("");
+  };
+
+  useEffect(() => {
+    if (!isAssistantOpen) {
+      return;
+    }
+    const container = assistantScrollRef.current;
+    if (container) {
+      container.scrollTop = container.scrollHeight;
+    }
+  }, [assistantMessages, isAssistantOpen]);
 
   return (
     <MainLayout>
@@ -104,8 +228,16 @@ const MyPage = () => {
             <div className="flex items-center gap-4 mb-6">
               <div className="relative">
                 <div className="w-20 h-20 rounded-full bg-secondary p-1">
-                  <div className="w-full h-full rounded-full bg-background flex items-center justify-center">
-                    <User className="w-8 h-8 text-muted-foreground" />
+                  <div className="w-full h-full rounded-full bg-background overflow-hidden flex items-center justify-center">
+                    {profileImage ? (
+                      <img
+                        src={profileImage}
+                        alt="프로필 사진"
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <User className="w-8 h-8 text-muted-foreground" />
+                    )}
                   </div>
                 </div>
                 <div className="absolute inset-0 rounded-full border-2 border-yellow-600/30" />
@@ -113,7 +245,7 @@ const MyPage = () => {
 
               <div className="flex-1">
                 <h2 className="font-serif text-2xl text-primary gold-accent">
-                  사용자님
+                  {profileNickname}님
                 </h2>
                 <p className="text-sm text-muted-foreground">
                   레벨 3 · 경험치 85%
@@ -243,7 +375,23 @@ const MyPage = () => {
                   return (
                     <button
                       key={item.id}
-                      onClick={() => {}}
+                      onClick={() => {
+                        if (item.id === "logout") {
+                          openLogoutConfirm();
+                        }
+                        if (item.id === "edit") {
+                          navigate("/edit-profile");
+                        }
+                        if (item.id === "report") {
+                          setIsReportOpen(true);
+                        }
+                        if (item.id === "inquiry") {
+                          setIsInquiryOpen(true);
+                        }
+                        if (item.id === "assistant") {
+                          toggleAssistant();
+                        }
+                      }}
                       className={cn(
                         "w-full p-5 text-left transition-all duration-200 group relative hover:bg-secondary/30",
                         !isLast && "border-b border-border"
@@ -287,7 +435,7 @@ const MyPage = () => {
                   return (
                     <button
                       key={item.id}
-                      onClick={() => {}}
+                      onClick={() => setIsWithdrawOpen(true)}
                       className="w-full p-5 text-left transition-all duration-200 group relative hover:bg-red-50/10"
                     >
                       <div className="absolute left-0 top-0 bottom-0 w-1 bg-red-500/50 group-hover:bg-red-500 transition-colors" />
@@ -389,6 +537,406 @@ const MyPage = () => {
                 </div>
               ))}
             </div>
+          </div>
+        </div>
+      )}
+
+      {isWithdrawOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+          <button
+            type="button"
+            className="absolute inset-0 bg-black/60"
+            aria-label="닫기"
+            onClick={closeWithdrawModal}
+          />
+          <div className="relative w-full max-w-lg bg-card rounded-xl shadow-xl border border-border p-6">
+            <button
+              type="button"
+              className="absolute right-4 top-4 text-muted-foreground hover:text-foreground transition-colors"
+              onClick={closeWithdrawModal}
+              aria-label="닫기"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="flex items-center gap-2 mb-2">
+              <AlertTriangle className="w-5 h-5 text-red-500" />
+              <h3 className="font-semibold text-foreground">회원 탈퇴</h3>
+            </div>
+            <p className="text-sm text-muted-foreground whitespace-pre-line mb-6">
+              회원정보 및 기록, 사진 등 서비스 이용기록은 모두 삭제되며, 삭제된 데이터는 복구되지 않습니다.
+              {"\n"}삭제되는 내용을 확인하시고 필요한 데이터는 미리 백업을 해주세요.
+            </p>
+
+            <label className="flex items-start gap-3 rounded-lg border border-border bg-secondary/30 p-4">
+              <input
+                type="checkbox"
+                className="mt-1 h-4 w-4 accent-red-500"
+                checked={isWithdrawAgreed}
+                onChange={(event) => setIsWithdrawAgreed(event.target.checked)}
+              />
+              <span className="text-sm text-foreground">
+                안내 사항을 확인하였으며, 이에 동의합니다.
+              </span>
+            </label>
+
+            <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+              <button
+                type="button"
+                className="flex-1 rounded-lg border border-border px-4 py-2 text-sm font-semibold text-foreground transition-colors hover:bg-secondary/40"
+                onClick={closeWithdrawModal}
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                className={cn(
+                  "flex-1 rounded-lg bg-red-500 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-600",
+                  !isWithdrawAgreed && "pointer-events-none opacity-60"
+                )}
+                disabled={!isWithdrawAgreed}
+                onClick={handleWithdrawConfirm}
+              >
+                회원 탈퇴
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isWithdrawCompleteOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+          <button
+            type="button"
+            className="absolute inset-0 bg-black/60"
+            aria-label="닫기"
+            onClick={closeWithdrawCompleteModal}
+          />
+          <div className="relative w-full max-w-sm bg-card rounded-xl shadow-xl border border-border p-6 text-center">
+            <p className="text-sm text-foreground">회원 탈퇴 되었습니다.</p>
+            <button
+              type="button"
+              className="mt-5 w-full rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
+              onClick={closeWithdrawCompleteModal}
+            >
+              확인
+            </button>
+          </div>
+        </div>
+      )}
+
+      {isLogoutConfirmOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+          <button
+            type="button"
+            className="absolute inset-0 bg-black/60"
+            aria-label="닫기"
+            onClick={closeLogoutConfirm}
+          />
+          <div className="relative w-full max-w-sm bg-card rounded-xl shadow-xl border border-border p-6 text-center">
+            <p className="text-sm text-foreground">로그아웃하시겠습니까?</p>
+            <div className="mt-5 flex flex-col gap-3 sm:flex-row">
+              <button
+                type="button"
+                className="flex-1 rounded-lg border border-border px-4 py-2 text-sm font-semibold text-foreground transition-colors hover:bg-secondary/40"
+                onClick={closeLogoutConfirm}
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                className="flex-1 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
+                onClick={handleLogoutConfirm}
+              >
+                확인
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isLogoutCompleteOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+          <button
+            type="button"
+            className="absolute inset-0 bg-black/60"
+            aria-label="닫기"
+            onClick={closeLogoutComplete}
+          />
+          <div className="relative w-full max-w-sm bg-card rounded-xl shadow-xl border border-border p-6 text-center">
+            <p className="text-sm text-foreground">로그아웃 되었습니다.</p>
+            <button
+              type="button"
+              className="mt-5 w-full rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
+              onClick={closeLogoutComplete}
+            >
+              확인
+            </button>
+          </div>
+        </div>
+      )}
+
+      {isReportOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+          <button
+            type="button"
+            className="absolute inset-0 bg-black/60"
+            aria-label="닫기"
+            onClick={closeReportModal}
+          />
+          <div className="relative w-full max-w-lg bg-card rounded-xl shadow-xl border border-border p-6">
+            <button
+              type="button"
+              className="absolute right-4 top-4 text-muted-foreground hover:text-foreground transition-colors"
+              onClick={closeReportModal}
+              aria-label="닫기"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="flex items-center gap-2 mb-2">
+              <AlertTriangle className="w-5 h-5 text-red-500" />
+              <h3 className="font-semibold text-foreground">회원 신고</h3>
+            </div>
+            <p className="text-sm text-muted-foreground mb-6">
+              신고 대상과 사유를 입력해 주세요.
+            </p>
+
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <label
+                  htmlFor="report-nickname"
+                  className="text-sm font-medium text-foreground"
+                >
+                  회원 닉네임
+                </label>
+                <input
+                  id="report-nickname"
+                  name="report-nickname"
+                  type="text"
+                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  placeholder="닉네임을 입력하세요"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label
+                  htmlFor="report-userid"
+                  className="text-sm font-medium text-foreground"
+                >
+                  회원 아이디
+                </label>
+                <input
+                  id="report-userid"
+                  name="report-userid"
+                  type="text"
+                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  placeholder="아이디를 입력하세요"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label
+                  htmlFor="report-reason"
+                  className="text-sm font-medium text-foreground"
+                >
+                  신고 사유
+                </label>
+                <textarea
+                  id="report-reason"
+                  name="report-reason"
+                  rows={4}
+                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  placeholder="신고 사유를 입력하세요"
+                />
+              </div>
+            </div>
+
+            <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+              <button
+                type="button"
+                className="flex-1 rounded-lg border border-border px-4 py-2 text-sm font-semibold text-foreground transition-colors hover:bg-secondary/40"
+                onClick={closeReportModal}
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                className="flex-1 rounded-lg bg-red-500 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-600"
+                onClick={handleReportSubmit}
+              >
+                신고
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isReportCompleteOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+          <button
+            type="button"
+            className="absolute inset-0 bg-black/60"
+            aria-label="닫기"
+            onClick={closeReportComplete}
+          />
+          <div className="relative w-full max-w-sm bg-card rounded-xl shadow-xl border border-border p-6 text-center">
+            <p className="text-sm text-foreground">
+              신고가 성공적으로 접수되었습니다.
+            </p>
+            <button
+              type="button"
+              className="mt-5 w-full rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
+              onClick={closeReportComplete}
+            >
+              확인
+            </button>
+          </div>
+        </div>
+      )}
+
+      {isInquiryOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+          <button
+            type="button"
+            className="absolute inset-0 bg-black/60"
+            aria-label="닫기"
+            onClick={closeInquiryModal}
+          />
+          <div className="relative w-full max-w-lg bg-card rounded-xl shadow-xl border border-border p-6">
+            <button
+              type="button"
+              className="absolute right-4 top-4 text-muted-foreground hover:text-foreground transition-colors"
+              onClick={closeInquiryModal}
+              aria-label="닫기"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="flex items-center gap-2 mb-2">
+              <MessageCircle className="w-5 h-5 text-yellow-600" />
+              <h3 className="font-semibold text-foreground">문의</h3>
+            </div>
+            <p className="text-sm text-muted-foreground mb-6">
+              문의할 내용을 자유롭게 작성해주세요.
+            </p>
+
+            <div className="space-y-2">
+              <label
+                htmlFor="inquiry-message"
+                className="text-sm font-medium text-foreground"
+              >
+                문의 내용
+              </label>
+              <textarea
+                id="inquiry-message"
+                name="inquiry-message"
+                rows={5}
+                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                placeholder="문의 내용을 입력하세요"
+              />
+            </div>
+
+            <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+              <button
+                type="button"
+                className="flex-1 rounded-lg border border-border px-4 py-2 text-sm font-semibold text-foreground transition-colors hover:bg-secondary/40"
+                onClick={closeInquiryModal}
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                className="flex-1 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
+                onClick={handleInquirySubmit}
+              >
+                문의
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isInquiryCompleteOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+          <button
+            type="button"
+            className="absolute inset-0 bg-black/60"
+            aria-label="닫기"
+            onClick={closeInquiryComplete}
+          />
+          <div className="relative w-full max-w-sm bg-card rounded-xl shadow-xl border border-border p-6 text-center">
+            <p className="text-sm text-foreground">
+              문의가 성공적으로 접수되었습니다.
+            </p>
+            <button
+              type="button"
+              className="mt-5 w-full rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
+              onClick={closeInquiryComplete}
+            >
+              확인
+            </button>
+          </div>
+        </div>
+      )}
+
+      {isAssistantOpen && (
+        <div className="fixed bottom-6 right-6 z-40 w-[320px] sm:w-[360px]">
+          <div className="rounded-xl border border-border bg-card shadow-xl overflow-hidden">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+              <div className="flex items-center gap-2">
+                <Rocket className="w-4 h-4 text-yellow-600" />
+                <h4 className="text-sm font-semibold text-foreground">
+                  도우미
+                </h4>
+              </div>
+              <button
+                type="button"
+                onClick={toggleAssistant}
+                className="text-muted-foreground hover:text-foreground transition-colors"
+                aria-label="닫기"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div
+              ref={assistantScrollRef}
+              className="max-h-72 overflow-y-auto px-4 py-3 space-y-3"
+            >
+              {assistantMessages.map((message) => (
+                <div
+                  key={message.id}
+                  className={cn(
+                    "rounded-lg px-3 py-2 text-sm",
+                    message.role === "user"
+                      ? "bg-yellow-700/10 text-foreground ml-auto"
+                      : "bg-secondary/40 text-muted-foreground"
+                  )}
+                >
+                  {message.text}
+                </div>
+              ))}
+            </div>
+
+            <form
+              className="border-t border-border px-3 py-3 flex items-center gap-2"
+              onSubmit={handleAssistantSend}
+            >
+              <input
+                type="text"
+                className="flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                placeholder="궁금한 내용을 입력하세요"
+                value={assistantInput}
+                onChange={(event) => setAssistantInput(event.target.value)}
+              />
+              <button
+                type="submit"
+                className="rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
+              >
+                전송
+              </button>
+            </form>
           </div>
         </div>
       )}

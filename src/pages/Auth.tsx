@@ -103,6 +103,7 @@ const Auth = () => {
 
     return (
       <div className="space-y-1.5">
+        
         <label className={cn(
           "font-serif text-sm block ml-1 transition-colors",
           hasError ? "text-red-800/80" : "text-ink/80"
@@ -151,7 +152,7 @@ const Auth = () => {
   };
 
   return (
-    <MainLayout>
+    <MainLayout showSidebar={false}>
       <div className="min-h-screen flex items-center justify-center py-12 px-4">
         <div className="relative w-full max-w-md perspective-1000">
           

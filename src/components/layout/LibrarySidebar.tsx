@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { BookOpen, History, Library, User, Settings, LogIn, X, Home, BookMarked } from "lucide-react";
+import { BookOpen, History, Library, User, Settings, LogOut, X, Home, BookMarked } from "lucide-react"; // LogIn -> LogOut 변경
 import { cn } from "@/lib/utils";
 
 // 1. 메뉴 데이터
@@ -17,7 +17,8 @@ const topMenuItems: MenuItem[] = [
   { id: "library", label: "라이브러리", icon: Library, path: "/library" },
 ];
 
-const authItem: MenuItem = { id: "auth", label: "로그인 / 회원가입", icon: LogIn, path: "/auth" };
+// path를 특수 식별자로 변경
+const logoutItem: MenuItem = { id: "logout", label: "로그아웃", icon: LogOut, path: "#logout" };
 
 const bottomRowItems: MenuItem[] = [
   { id: "mypage", label: "마이페이지", icon: User, path: "/mypage" },
@@ -37,9 +38,25 @@ export function LibrarySidebar({ isOpen, onClose, onToggle }: LibrarySidebarProp
   const navigate = useNavigate();
   const location = useLocation();
   const [hoveredItem, setHoveredItem] = useState<string | null>(null);
+  
+  // 로그아웃 모달 상태 관리
+  const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
 
   const handleNavigate = (path: string) => {
+    // 로그아웃 버튼인 경우 모달만 띄움
+    if (path === "#logout") {
+      setIsLogoutModalOpen(true);
+      return;
+    }
+    
+    // 일반 메뉴 이동
     navigate(path);
+    onClose();
+  };
+
+  const handleLogoutConfirm = () => {
+    navigate("/auth"); // 실제 로그아웃 로직이 있다면 여기서 처리
+    setIsLogoutModalOpen(false);
     onClose();
   };
 
@@ -49,7 +66,6 @@ export function LibrarySidebar({ isOpen, onClose, onToggle }: LibrarySidebarProp
     const isActive = location.pathname === item.path;
     const isHovered = hoveredItem === item.id;
     
-    // 반반 버튼인지 확인 (여백 조정을 위해 확인은 하되, 아이콘 위치는 고정)
     const isSplitButton = className.includes("flex-1");
 
     return (
@@ -69,9 +85,7 @@ export function LibrarySidebar({ isOpen, onClose, onToggle }: LibrarySidebarProp
       >
         <div
           className={cn(
-            // justify-center: 텍스트는 항상 중앙 정렬
             "relative flex items-center justify-center py-3 rounded-r-sm transition-all duration-300 h-full",
-            // 반반 버튼일 때는 좌우 패딩을 조금 줄임 (공간 확보)
             isSplitButton ? "px-1" : "px-3",
             "book-cover border-l-4",
             isActive
@@ -79,19 +93,14 @@ export function LibrarySidebar({ isOpen, onClose, onToggle }: LibrarySidebarProp
               : "border-l-bookmark hover:border-l-gold"
           )}
         >
-          
-          {/* 아이콘: 조건 없이 항상 absolute로 왼쪽에 고정 */}
           <Icon
             className={cn(
               "absolute transition-colors duration-300 shrink-0 w-4 h-4", 
-              // 반반 버튼일 때는 왼쪽 여백을 조금 줄여서(left-2) 빡빡하지 않게 함
-              // 일반 버튼은 여유 있게 left-3
               isSplitButton ? "left-2" : "left-3",
               isActive ? "text-gold" : "text-sepia group-hover:text-gold"
             )}
           />
 
-          {/* 텍스트: 중앙 정렬 */}
           <span
             className={cn(
               "font-serif text-xs transition-colors duration-300 whitespace-nowrap z-10",
@@ -101,7 +110,6 @@ export function LibrarySidebar({ isOpen, onClose, onToggle }: LibrarySidebarProp
             {item.label}
           </span>
 
-          {/* 호버 효과 */}
           <div
             className={cn(
               "absolute inset-0 bg-gradient-to-r from-transparent via-gold/10 to-transparent transition-opacity duration-500",
@@ -115,6 +123,7 @@ export function LibrarySidebar({ isOpen, onClose, onToggle }: LibrarySidebarProp
 
   return (
     <>
+      {/* 1. 사이드바 배경 (Overlay) */}
       <div
         className={cn(
           "fixed inset-0 bg-background/80 backdrop-blur-sm z-40 transition-opacity duration-300",
@@ -123,6 +132,7 @@ export function LibrarySidebar({ isOpen, onClose, onToggle }: LibrarySidebarProp
         onClick={onClose}
       />
 
+      {/* 2. 사이드바 본문 */}
       <aside
         className={cn(
           "fixed left-0 top-0 h-full w-72 z-50 transition-transform duration-500 ease-out",
@@ -179,13 +189,58 @@ export function LibrarySidebar({ isOpen, onClose, onToggle }: LibrarySidebarProp
           </nav>
 
           <div className="mt-4 pt-4 border-t border-border/30 flex flex-col gap-3">
-             {renderMenuItem(authItem, 0, 4, "w-full")}
+             {/* 로그아웃 버튼으로 변경됨 */}
+             {renderMenuItem(logoutItem, 0, 4, "w-full")}
              <div className="flex gap-2 w-full">
                {bottomRowItems.map((item, index) => renderMenuItem(item, index, 5, "flex-1"))}
              </div>
           </div>
         </div>
       </aside>
+
+      {/* 3. 로그아웃 확인 모달 */}
+      {isLogoutModalOpen && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center px-4">
+            {/* Backdrop */}
+            <div 
+                className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+                onClick={() => setIsLogoutModalOpen(false)}
+            />
+            
+            {/* Modal Content */}
+            <div className="relative w-full max-w-sm bg-card border border-gold/50 rounded-lg shadow-book p-6 animate-fade-in">
+                <div className="text-center space-y-4">
+                    <div className="mx-auto w-12 h-12 rounded-full bg-secondary/30 flex items-center justify-center border border-border">
+                        <LogOut className="w-6 h-6 text-gold" />
+                    </div>
+                    
+                    <div className="space-y-2">
+                        <h3 className="font-serif text-xl text-foreground font-bold">
+                            로그아웃
+                        </h3>
+                        <p className="font-serif text-muted-foreground text-sm">
+                            정말 로그아웃 하시겠습니까?
+                        </p>
+                    </div>
+
+                    <div className="flex gap-3 pt-2">
+                        <button
+                            onClick={() => setIsLogoutModalOpen(false)}
+                            className="flex-1 px-4 py-2 rounded-md border border-input bg-background hover:bg-accent hover:text-accent-foreground transition-colors font-serif text-sm"
+                        >
+                            아니오
+                        </button>
+                        <button
+                            onClick={handleLogoutConfirm}
+                            className="flex-1 px-4 py-2 rounded-md bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors font-serif text-sm shadow-sm"
+                        >
+                            예
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+      )}
     </>
   );
 }
