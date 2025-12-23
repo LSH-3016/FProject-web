@@ -24,12 +24,6 @@ const Index = () => {
         <div className="w-full flex justify-center animate-fade-in">
           <JournalBook />
         </div>
-
-        <footer className="mt-8 text-center animate-fade-in w-full">
-          <p className="font-serif text-sm text-muted-foreground opacity-60">
-            왼쪽의 책갈피를 눌러 메뉴를 열어보세요
-          </p>
-        </footer>
       </div>
     </MainLayout>
   );

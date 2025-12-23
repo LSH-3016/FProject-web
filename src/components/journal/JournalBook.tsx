@@ -241,7 +241,7 @@ export const JournalBook = () => {
                         덮기
                       </Button>
                       <Button variant="default" size="sm" className="bg-stone-800 text-[#fdfbf7] hover:bg-stone-700 shadow-sm font-sans">
-                        책장에 보관하기
+                        히스토리에 등록
                       </Button>
                     </div>
                   </div>

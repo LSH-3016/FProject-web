@@ -184,12 +184,6 @@ export function LibrarySidebar({ isOpen, onClose, onToggle }: LibrarySidebarProp
                {bottomRowItems.map((item, index) => renderMenuItem(item, index, 5, "flex-1"))}
              </div>
           </div>
-
-          <div className="mt-6 pt-2">
-            <p className="font-handwriting text-center text-muted-foreground text-sm">
-              나의 추억을 기록하는 공간
-            </p>
-          </div>
         </div>
       </aside>
     </>

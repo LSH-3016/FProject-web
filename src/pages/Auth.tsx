@@ -200,10 +200,7 @@ const Auth = () => {
                       {mode === "forgot" && "비밀번호 찾기"}
                     </h1>
                     <p className="font-handwriting text-ink/60 text-sm">
-                      {mode === "login" && "당신의 추억을 기록해보세요!"}
-                      {mode === "signup" && "새로운 책장을 만듭니다."}
                       {mode === "verify" && "이메일로 전송된 6자리 코드를 입력하세요"}
-                      {mode === "forgot" && "가입하신 이메일을 알려주세요"}
                     </p>
                   </div>
                 </div>

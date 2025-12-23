@@ -125,9 +125,6 @@ const Settings = () => {
             <h1 className="font-serif text-3xl mb-2 gold-accent">
               {t("settings.title")}
             </h1>
-            <p className="font-handwriting text-xl text-muted-foreground">
-              {t("settings.subtitle")}
-            </p>
           </header>
 
           {/* Settings list */}
@@ -199,16 +196,6 @@ const Settings = () => {
                 );
               })}
             </div>
-          </div>
-
-          {/* Version */}
-          <div className="mt-8 text-center">
-            <p className="font-serif text-sm text-muted-foreground">
-              {t("settings.version")}
-            </p>
-            <p className="font-handwriting text-muted-foreground mt-1">
-              {t("settings.copyright")}
-            </p>
           </div>
         </div>
       </div>

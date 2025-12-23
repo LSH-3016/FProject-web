@@ -29,37 +29,39 @@ const achievements: Achievement[] = [
 const Achievements = () => {
   return (
     <MainLayout>
-      {/* [스타일 강제 적용] 
-        id 선택자를 사용하여 우선순위를 높이고 !important로 강제 적용합니다.
-        배경(Track)을 transparent로 설정하여 흰색 막대를 제거합니다.
+      {/* [해결책: 순수 CSS 주입]
+        Tailwind 설정을 우회하여 브라우저에 직접 스타일을 명령합니다.
+        클래스명: .brown-scroll-container
       */}
       <style>{`
-        #achievements-scroll-container {
-          overflow-y: auto;
-          scrollbar-width: thin; /* Firefox */
-          scrollbar-color: #78716c transparent; /* Firefox: thumb track */
-        }
-        
-        /* Chrome, Safari, Edge */
-        #achievements-scroll-container::-webkit-scrollbar {
-          width: 6px !important;
-          background: transparent !important; /* 트랙 배경 투명 강제 */
-        }
-        
-        #achievements-scroll-container::-webkit-scrollbar-track {
-          background-color: transparent !important; /* 흰색 배경 제거 */
-          border-radius: 10px;
+        /* 스크롤바 전체 너비 */
+        .brown-scroll-container::-webkit-scrollbar {
+          width: 8px !important;
+          display: block !important;
         }
 
-        #achievements-scroll-container::-webkit-scrollbar-thumb {
-          background-color: #a8a29e !important; /* Stone-400 */
-          border-radius: 10px !important;
-          border: 1px solid transparent; /* 핸들 주변 여백 효과 */
-          background-clip: content-box;
+        /* 스크롤바 트랙 (배경) - 투명 */
+        .brown-scroll-container::-webkit-scrollbar-track {
+          background: transparent !important;
         }
 
-        #achievements-scroll-container::-webkit-scrollbar-thumb:hover {
-          background-color: #78716c !important; /* Stone-500 */
+        /* 스크롤바 핸들 (움직이는 막대) - 브라운 */
+        .brown-scroll-container::-webkit-scrollbar-thumb {
+          background-color: #855a30 !important; /* 진한 브라운 */
+          border-radius: 4px !important;
+          border: 2px solid transparent !important; /* 막대 주변 여백 효과 */
+          background-clip: content-box !important;
+        }
+
+        /* 호버 시 색상 */
+        .brown-scroll-container::-webkit-scrollbar-thumb:hover {
+          background-color: #5c3d1f !important;
+        }
+
+        /* 파이어폭스 호환성 */
+        .brown-scroll-container {
+          scrollbar-width: thin !important;
+          scrollbar-color: #855a30 transparent !important;
         }
       `}</style>
 
@@ -74,54 +76,57 @@ const Achievements = () => {
               전체 업적과 달성 여부를 확인할 수 있어요.
             </p>
 
-            {/* id="achievements-scroll-container" 추가하여 위 스타일과 연결 */}
-            <div 
-              id="achievements-scroll-container"
-              className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[600px] pr-2"
-            >
-              {achievements.map((achievement) => (
-                <div
-                  key={achievement.label}
-                  className={cn(
-                    "rounded-lg border p-4 transition-colors",
-                    achievement.earned
-                      ? "bg-yellow-700/10 border-yellow-700/20"
-                      : "bg-secondary/30 border-border"
-                  )}
-                >
-                  <div className="flex items-center gap-3">
-                    <div
-                      className={cn(
-                        "w-10 h-10 rounded-full flex items-center justify-center shrink-0",
-                        achievement.earned
-                          ? "bg-yellow-700/10 text-yellow-700"
-                          : "bg-secondary text-muted-foreground"
-                      )}
-                    >
-                      {achievement.earned ? (
-                        <CheckCircle2 className="w-5 h-5" />
-                      ) : (
-                        <Lock className="w-5 h-5" />
-                      )}
-                    </div>
-                    <div className="flex-1">
-                      <p className="text-sm font-semibold text-foreground">
-                        {achievement.label}
-                      </p>
-                      <p
+            {/* [적용 부분]
+              className에 "brown-scroll-container"를 추가했습니다.
+              h-[500px]: 높이를 500px로 고정하여 내용이 넘치게 만듭니다.
+              overflow-y-auto: 넘치는 내용을 스크롤로 처리합니다.
+            */}
+            <div className="brown-scroll-container h-[500px] overflow-y-auto pr-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {achievements.map((achievement) => (
+                  <div
+                    key={achievement.label}
+                    className={cn(
+                      "rounded-lg border p-4 transition-colors",
+                      achievement.earned
+                        ? "bg-yellow-700/10 border-yellow-700/20"
+                        : "bg-secondary/30 border-border"
+                    )}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div
                         className={cn(
-                          "text-xs",
+                          "w-10 h-10 rounded-full flex items-center justify-center shrink-0",
                           achievement.earned
-                            ? "text-yellow-700"
-                            : "text-muted-foreground"
+                            ? "bg-yellow-700/10 text-yellow-700"
+                            : "bg-secondary text-muted-foreground"
                         )}
                       >
-                        {achievement.earned ? "달성" : "미달성"}
-                      </p>
+                        {achievement.earned ? (
+                          <CheckCircle2 className="w-5 h-5" />
+                        ) : (
+                          <Lock className="w-5 h-5" />
+                        )}
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-sm font-semibold text-foreground">
+                          {achievement.label}
+                        </p>
+                        <p
+                          className={cn(
+                            "text-xs",
+                            achievement.earned
+                              ? "text-yellow-700"
+                              : "text-muted-foreground"
+                          )}
+                        >
+                          {achievement.earned ? "달성" : "미달성"}
+                        </p>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
           </section>
         </div>
