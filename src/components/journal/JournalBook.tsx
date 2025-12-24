@@ -1,5 +1,5 @@
 import { useState, KeyboardEvent, useEffect, useRef } from "react";
-import { Send, Sparkles, Feather, HelpCircle, Loader2 } from "lucide-react";
+import { Send, Sparkles, Feather, HelpCircle, Loader2, X, Trash2 } from "lucide-react"; // X, Trash2 아이콘 추가
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -14,8 +14,14 @@ export const JournalBook = () => {
   const [entries, setEntries] = useState<string[]>([]);
   const [currentEntry, setCurrentEntry] = useState("");
   const entriesContainerRef = useRef<HTMLDivElement>(null);
+  
+  // 요약(Analysis) 관련 상태
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [dialogStep, setDialogStep] = useState<"confirm" | "loading" | "result">("confirm");
+
+  // [추가됨] 삭제 관련 상태
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [deleteTargetIndex, setDeleteTargetIndex] = useState<number | null>(null);
 
   useEffect(() => {
     if (entriesContainerRef.current) {
@@ -38,6 +44,21 @@ export const JournalBook = () => {
     }
   };
 
+  // [추가됨] 삭제 요청 핸들러 (X버튼 클릭 시)
+  const handleDeleteRequest = (index: number) => {
+    setDeleteTargetIndex(index);
+    setIsDeleteDialogOpen(true);
+  };
+
+  // [추가됨] 삭제 확정 핸들러 (팝업에서 '예' 클릭 시)
+  const confirmDelete = () => {
+    if (deleteTargetIndex !== null) {
+      setEntries((prev) => prev.filter((_, i) => i !== deleteTargetIndex));
+      setIsDeleteDialogOpen(false);
+      setDeleteTargetIndex(null);
+    }
+  };
+
   const handleOpenAnalysis = () => {
     setDialogStep("confirm");
     setIsDialogOpen(true);
@@ -56,7 +77,6 @@ export const JournalBook = () => {
     { type: "negative" as const, label: "쓸쓸함", percentage: 20 },
   ];
 
-  // 1. 메인 화면용 스크롤바 (앱 테마 - Primary Color)
   const defaultScrollbarStyle = `
     pr-2 overflow-y-auto
     [&::-webkit-scrollbar]:w-1.5
@@ -67,7 +87,6 @@ export const JournalBook = () => {
     transition-colors
   `;
 
-  // 2. 종이 팝업용 스크롤바 (종이 테마 - Stone/Gray Color)
   const paperScrollbarStyle = `
     pr-4 overflow-y-auto
     [&::-webkit-scrollbar]:w-1.5
@@ -107,17 +126,26 @@ export const JournalBook = () => {
             {entries.map((entry, idx) => (
               <div 
                 key={`entry-${idx}`}
-                // 변경된 부분: 
-                // bg-[#ebe5da] -> 확실히 눈에 띄는 진한 베이지색
-                // border-[#dcd6cc] -> 베이지색에 맞춘 테두리
-                className="flex items-start gap-3 p-4 rounded-lg bg-[#ebe5da] shadow-sm border border-[#dcd6cc] animate-in fade-in slide-in-from-left-2 duration-300 border-l-4 border-l-primary"
+                // group 클래스 추가 (호버 시 X버튼 표시용)
+                className="group flex items-start gap-3 p-4 rounded-lg bg-[#ebe5da] shadow-sm border border-[#dcd6cc] animate-in fade-in slide-in-from-left-2 duration-300 border-l-4 border-l-primary relative"
               >
-                <span className="text-xs text-stone-500 font-mono mt-1 font-medium">
+                <span className="text-xs text-stone-500 font-mono mt-1 font-medium shrink-0">
                   {String(idx + 1).padStart(2, "0")}
                 </span>
-                <p className="text-stone-800 text-sm flex-1 leading-relaxed font-medium">
+                <p className="text-stone-800 text-sm flex-1 leading-relaxed font-medium whitespace-pre-wrap break-all">
                   {entry}
                 </p>
+                
+                {/* [추가됨] 삭제 버튼 (X) */}
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  onClick={() => handleDeleteRequest(idx)}
+                  className="h-6 w-6 shrink-0 text-stone-400 hover:text-red-500 hover:bg-red-50 transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100"
+                  aria-label="이 기록 삭제"
+                >
+                  <X className="w-4 h-4" />
+                </Button>
               </div>
             ))}
           </div>
@@ -148,7 +176,31 @@ export const JournalBook = () => {
         )}
       </div>
 
-      {/* 팝업 (Dialog) */}
+      {/* [추가됨] 삭제 확인 팝업 (Dialog) */}
+      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <DialogContent className="sm:max-w-sm bg-card/95 backdrop-blur-md border border-primary/10 shadow-xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-600">
+              <Trash2 className="w-5 h-5" />
+              기록 삭제
+            </DialogTitle>
+            <DialogDescription className="pt-2">
+              이 메시지를 정말 삭제하시겠습니까?<br/>
+              삭제된 기록은 복구할 수 없습니다.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0 mt-4">
+            <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>
+              아니요
+            </Button>
+            <Button variant="destructive" onClick={confirmDelete} className="bg-red-500 hover:bg-red-600">
+              네, 삭제할래요
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 기존 요약 팝업 (Dialog) */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent 
           className={`
@@ -208,13 +260,13 @@ export const JournalBook = () => {
                       })}
                     </h3>
                     <div className="flex items-center gap-2 mt-2">
-                       {mockEmotions.map((e, i) => (
-                         <span key={i} className={`text-xs px-2 py-0.5 rounded-full border ${
-                           i === 0 ? "border-rose-300 text-rose-600 bg-rose-50" : "border-stone-300 text-stone-500"
-                         }`}>
-                           #{e.label}
-                         </span>
-                       ))}
+                        {mockEmotions.map((e, i) => (
+                          <span key={i} className={`text-xs px-2 py-0.5 rounded-full border ${
+                            i === 0 ? "border-rose-300 text-rose-600 bg-rose-50" : "border-stone-300 text-stone-500"
+                          }`}>
+                            #{e.label}
+                          </span>
+                        ))}
                     </div>
                   </div>
 
