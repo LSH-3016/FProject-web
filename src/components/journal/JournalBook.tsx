@@ -1,5 +1,5 @@
 import { useState, KeyboardEvent, useEffect, useRef } from "react";
-import { Send, Sparkles, Feather, HelpCircle, Loader2, X, Trash2 } from "lucide-react"; // X, Trash2 아이콘 추가
+import { Send, Sparkles, Feather, HelpCircle, Loader2, X, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/dialog";
 
 export const JournalBook = () => {
-  const [entries, setEntries] = useState<string[]>([]);
+  const [entries, setEntries] = useState<Array<{ id: string; user_id: string; content: string; created_at: Date }>>([]);
   const [currentEntry, setCurrentEntry] = useState("");
   const entriesContainerRef = useRef<HTMLDivElement>(null);
   
@@ -23,16 +23,87 @@ export const JournalBook = () => {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [deleteTargetIndex, setDeleteTargetIndex] = useState<number | null>(null);
 
+  // [추가됨] API 관련 상태
+  const [isLoadingEntries, setIsLoadingEntries] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const currentUserId = "user_001"; // 실제로는 인증된 사용자 ID를 사용
+
   useEffect(() => {
     if (entriesContainerRef.current) {
       entriesContainerRef.current.scrollTo({ top: entriesContainerRef.current.scrollHeight, behavior: "smooth" });
     }
   }, [entries]);
 
-  const addEntry = () => {
-    if (currentEntry.trim()) {
-      setEntries((prev) => [...prev, currentEntry.trim()]);
+  // [추가됨] 컴포넌트 마운트 시 사용자 메시지 로드
+  useEffect(() => {
+    loadUserEntries();
+  }, []);
+
+  // [추가됨] API 함수들
+  const loadUserEntries = async () => {
+    setIsLoadingEntries(true);
+    try {
+      // 실제 API 호출
+      // const response = await fetch(`/users/${currentUserId}/messages?limit=100&offset=0`);
+      // const messages = await response.json();
+      // setEntries(messages);
+      
+      // Mock 데이터로 시뮬레이션
+      await new Promise(resolve => setTimeout(resolve, 500));
+      console.log(`Loading entries for user: ${currentUserId}`);
+      
+    } catch (error) {
+      console.error("기록 로드 실패:", error);
+    } finally {
+      setIsLoadingEntries(false);
+    }
+  };
+
+  const addEntry = async () => {
+    if (!currentEntry.trim()) return;
+    
+    setIsSaving(true);
+    try {
+      // 실제 API 호출로 메시지 저장
+      // const response = await fetch('/messages', {
+      //   method: 'POST',
+      //   headers: { 'Content-Type': 'application/json' },
+      //   body: JSON.stringify({
+      //     user_id: currentUserId,
+      //     content: currentEntry.trim()
+      //   })
+      // });
+      // const savedEntry = await response.json();
+      
+      // Mock으로 즉시 추가
+      const newEntry = {
+        id: Date.now().toString(),
+        user_id: currentUserId,
+        content: currentEntry.trim(),
+        created_at: new Date()
+      };
+      
+      setEntries(prev => [...prev, newEntry]);
       setCurrentEntry("");
+      
+    } catch (error) {
+      console.error("기록 저장 실패:", error);
+      // 에러 처리 (토스트 알림 등)
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const deleteEntry = async (entryId: string) => {
+    try {
+      // 실제 API 호출로 메시지 삭제
+      // await fetch(`/messages/${entryId}`, { method: 'DELETE' });
+      
+      // Mock으로 즉시 삭제
+      setEntries(prev => prev.filter(entry => entry.id !== entryId));
+      
+    } catch (error) {
+      console.error("기록 삭제 실패:", error);
     }
   };
 
@@ -44,16 +115,17 @@ export const JournalBook = () => {
     }
   };
 
-  // [추가됨] 삭제 요청 핸들러 (X버튼 클릭 시)
-  const handleDeleteRequest = (index: number) => {
-    setDeleteTargetIndex(index);
+  // [수정됨] 삭제 요청 핸들러 - 인덱스 대신 ID 사용
+  const handleDeleteRequest = (entryId: string) => {
+    setDeleteTargetIndex(entries.findIndex(entry => entry.id === entryId));
     setIsDeleteDialogOpen(true);
   };
 
-  // [추가됨] 삭제 확정 핸들러 (팝업에서 '예' 클릭 시)
-  const confirmDelete = () => {
+  // [수정됨] 삭제 확정 핸들러 - API 호출 추가
+  const confirmDelete = async () => {
     if (deleteTargetIndex !== null) {
-      setEntries((prev) => prev.filter((_, i) => i !== deleteTargetIndex));
+      const entryToDelete = entries[deleteTargetIndex];
+      await deleteEntry(entryToDelete.id);
       setIsDeleteDialogOpen(false);
       setDeleteTargetIndex(null);
     }
@@ -118,29 +190,43 @@ export const JournalBook = () => {
           </div>
         </div>
 
-        {entries.length > 0 && (
+        {(isLoadingEntries || entries.length > 0) && (
           <div 
             ref={entriesContainerRef}
             className={`space-y-3 mb-6 max-h-[250px] ${defaultScrollbarStyle}`}
           >
+            {isLoadingEntries && (
+              <div className="flex justify-center py-4">
+                <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+              </div>
+            )}
+            
             {entries.map((entry, idx) => (
               <div 
-                key={`entry-${idx}`}
-                // group 클래스 추가 (호버 시 X버튼 표시용)
+                key={entry.id}
                 className="group flex items-start gap-3 p-4 rounded-lg bg-[#ebe5da] shadow-sm border border-[#dcd6cc] animate-in fade-in slide-in-from-left-2 duration-300 border-l-4 border-l-primary relative"
               >
                 <span className="text-xs text-stone-500 font-mono mt-1 font-medium shrink-0">
                   {String(idx + 1).padStart(2, "0")}
                 </span>
-                <p className="text-stone-800 text-sm flex-1 leading-relaxed font-medium whitespace-pre-wrap break-all">
-                  {entry}
-                </p>
+                <div className="flex-1">
+                  <p className="text-stone-800 text-sm leading-relaxed font-medium whitespace-pre-wrap break-all">
+                    {entry.content}
+                  </p>
+                  <p className="text-xs text-stone-400 mt-1">
+                    {entry.created_at.toLocaleString("ko-KR", {
+                      month: "short",
+                      day: "numeric",
+                      hour: "2-digit",
+                      minute: "2-digit"
+                    })}
+                  </p>
+                </div>
                 
-                {/* [추가됨] 삭제 버튼 (X) */}
                 <Button 
                   variant="ghost" 
                   size="icon" 
-                  onClick={() => handleDeleteRequest(idx)}
+                  onClick={() => handleDeleteRequest(entry.id)}
                   className="h-6 w-6 shrink-0 text-stone-400 hover:text-red-500 hover:bg-red-50 transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100"
                   aria-label="이 기록 삭제"
                 >
@@ -160,20 +246,30 @@ export const JournalBook = () => {
             className="w-full h-13 px-4 py-3 rounded-xl bg-secondary/20 border border-input focus:border-primary focus:ring-1 focus:ring-primary/20 resize-none text-foreground placeholder:text-muted-foreground/50 outline-none transition-all duration-300 font-serif"
           />
           <div className="absolute bottom-3 right-3">
-            <Button variant="ghost" size="icon" onClick={addEntry} disabled={!currentEntry.trim()} className="rounded-full hover:bg-primary/10 hover:text-primary transition-colors">
-              <Send className="w-4 h-4" />
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={addEntry} 
+              disabled={!currentEntry.trim() || isSaving} 
+              className="rounded-full hover:bg-primary/10 hover:text-primary transition-colors"
+            >
+              {isSaving ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Send className="w-4 h-4" />
+              )}
             </Button>
           </div>
         </div>
 
-        {entries.length > 0 && (
-          <div className="mt-6 flex justify-end">
+        <div className="mt-6 flex justify-end">
+          {entries.length > 0 && (
             <Button onClick={handleOpenAnalysis} className="gap-2 shadow-md hover:shadow-lg transition-all">
               <Sparkles className="w-4 h-4" />
               요약하기
             </Button>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       {/* [추가됨] 삭제 확인 팝업 (Dialog) */}
