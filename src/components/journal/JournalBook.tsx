@@ -19,14 +19,15 @@ export const JournalBook = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [dialogStep, setDialogStep] = useState<"confirm" | "loading" | "result">("confirm");
 
-  // [추가됨] 삭제 관련 상태
+  // 삭제 관련 상태
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [deleteTargetIndex, setDeleteTargetIndex] = useState<number | null>(null);
 
-  // [추가됨] API 관련 상태
+  // API 관련 상태
   const [isLoadingEntries, setIsLoadingEntries] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const currentUserId = "user_001"; // 실제로는 인증된 사용자 ID를 사용
+  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
 
   useEffect(() => {
     if (entriesContainerRef.current) {
@@ -34,26 +35,35 @@ export const JournalBook = () => {
     }
   }, [entries]);
 
-  // [추가됨] 컴포넌트 마운트 시 사용자 메시지 로드
+  // 컴포넌트 마운트 시 사용자 메시지 로드
   useEffect(() => {
     loadUserEntries();
   }, []);
 
-  // [추가됨] API 함수들
+  // API 함수들
   const loadUserEntries = async () => {
     setIsLoadingEntries(true);
     try {
-      // 실제 API 호출
-      // const response = await fetch(`/users/${currentUserId}/messages?limit=100&offset=0`);
-      // const messages = await response.json();
-      // setEntries(messages);
+      const response = await fetch(`${API_BASE_URL}/users/${currentUserId}/messages?limit=100&offset=0`);
       
-      // Mock 데이터로 시뮬레이션
-      await new Promise(resolve => setTimeout(resolve, 500));
-      console.log(`Loading entries for user: ${currentUserId}`);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const messages = await response.json();
+      
+      // API 응답의 created_at을 Date 객체로 변환
+      const formattedMessages = messages.map((msg: any) => ({
+        ...msg,
+        created_at: new Date(msg.created_at)
+      }));
+      
+      setEntries(formattedMessages);
       
     } catch (error) {
       console.error("기록 로드 실패:", error);
+      // 개발 중에는 빈 배열로 시작
+      setEntries([]);
     } finally {
       setIsLoadingEntries(false);
     }
@@ -64,31 +74,33 @@ export const JournalBook = () => {
     
     setIsSaving(true);
     try {
-      // 실제 API 호출로 메시지 저장
-      // const response = await fetch('/messages', {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify({
-      //     user_id: currentUserId,
-      //     content: currentEntry.trim()
-      //   })
-      // });
-      // const savedEntry = await response.json();
+      const response = await fetch(`${API_BASE_URL}/messages`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: currentUserId,
+          content: currentEntry.trim()
+        })
+      });
       
-      // Mock으로 즉시 추가
-      const newEntry = {
-        id: Date.now().toString(),
-        user_id: currentUserId,
-        content: currentEntry.trim(),
-        created_at: new Date()
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const savedEntry = await response.json();
+      
+      // API 응답의 created_at을 Date 객체로 변환
+      const formattedEntry = {
+        ...savedEntry,
+        created_at: new Date(savedEntry.created_at)
       };
       
-      setEntries(prev => [...prev, newEntry]);
+      setEntries(prev => [...prev, formattedEntry]);
       setCurrentEntry("");
       
     } catch (error) {
       console.error("기록 저장 실패:", error);
-      // 에러 처리 (토스트 알림 등)
+      alert("기록 저장에 실패했습니다. 다시 시도해주세요.");
     } finally {
       setIsSaving(false);
     }
@@ -96,14 +108,19 @@ export const JournalBook = () => {
 
   const deleteEntry = async (entryId: string) => {
     try {
-      // 실제 API 호출로 메시지 삭제
-      // await fetch(`/messages/${entryId}`, { method: 'DELETE' });
+      const response = await fetch(`${API_BASE_URL}/messages/${entryId}`, { 
+        method: 'DELETE' 
+      });
       
-      // Mock으로 즉시 삭제
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
       setEntries(prev => prev.filter(entry => entry.id !== entryId));
       
     } catch (error) {
       console.error("기록 삭제 실패:", error);
+      alert("기록 삭제에 실패했습니다. 다시 시도해주세요.");
     }
   };
 
@@ -115,13 +132,13 @@ export const JournalBook = () => {
     }
   };
 
-  // [수정됨] 삭제 요청 핸들러 - 인덱스 대신 ID 사용
+  // 삭제 요청 핸들러
   const handleDeleteRequest = (entryId: string) => {
     setDeleteTargetIndex(entries.findIndex(entry => entry.id === entryId));
     setIsDeleteDialogOpen(true);
   };
 
-  // [수정됨] 삭제 확정 핸들러 - API 호출 추가
+  // 삭제 확정 핸들러
   const confirmDelete = async () => {
     if (deleteTargetIndex !== null) {
       const entryToDelete = entries[deleteTargetIndex];
@@ -141,6 +158,52 @@ export const JournalBook = () => {
     setTimeout(() => {
       setDialogStep("result");
     }, 2000);
+  };
+
+  const saveToHistory = async () => {
+    try {
+      // 오늘의 모든 기록을 하나의 content로 합치기
+      const combinedContent = entries.map((entry, idx) => 
+        `${idx + 1}. ${entry.content}`
+      ).join('\n\n');
+
+      // 요약 결과도 포함 (실제로는 AI 요약 결과를 사용)
+      const summaryText = `오늘의 기록에서는 잔잔한 평온함이 느껴집니다. 
+과거를 그리워하는 마음과 함께, 고요한 쓸쓸함도 함께 담겨 있네요. 
+
+이 모든 감정이 모여 당신만의 하루가 됩니다. 
+때로는 지나간 추억이 아프게 다가오기도 하지만, 그것 또한 지금의 나를 만든 소중한 조각들입니다.
+
+내일은 오늘보다 조금 더 따뜻한 하루가 되기를 바랍니다.
+당신의 이야기는 여기서 끝이 아닙니다. 계속해서 써내려가세요.`;
+
+      const fullContent = `[요약]\n${summaryText}\n\n[상세 기록]\n${combinedContent}`;
+
+      const response = await fetch(`${API_BASE_URL}/history`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username: currentUserId,
+          content: fullContent,
+          record_date: new Date().toISOString().split('T')[0], // YYYY-MM-DD 형식
+          tags: mockEmotions.map(e => e.label) // ["평온", "그리움", "쓸쓸함"]
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const savedHistory = await response.json();
+      console.log('히스토리 저장 완료:', savedHistory);
+      
+      alert('히스토리에 성공적으로 등록되었습니다!');
+      setIsDialogOpen(false);
+      
+    } catch (error) {
+      console.error("히스토리 저장 실패:", error);
+      alert("히스토리 저장에 실패했습니다. 다시 시도해주세요.");
+    }
   };
 
   const mockEmotions = [
@@ -272,7 +335,7 @@ export const JournalBook = () => {
         </div>
       </div>
 
-      {/* [추가됨] 삭제 확인 팝업 (Dialog) */}
+      {/* 삭제 확인 팝업 */}
       <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <DialogContent className="sm:max-w-sm bg-card/95 backdrop-blur-md border border-primary/10 shadow-xl">
           <DialogHeader>
@@ -388,7 +451,12 @@ export const JournalBook = () => {
                       <Button variant="ghost" size="sm" onClick={() => setIsDialogOpen(false)} className="hover:bg-stone-200/50 hover:text-stone-800">
                         덮기
                       </Button>
-                      <Button variant="default" size="sm" className="bg-stone-800 text-[#fdfbf7] hover:bg-stone-700 shadow-sm font-sans">
+                      <Button 
+                        variant="default" 
+                        size="sm" 
+                        onClick={saveToHistory}
+                        className="bg-stone-800 text-[#fdfbf7] hover:bg-stone-700 shadow-sm font-sans"
+                      >
                         히스토리에 등록
                       </Button>
                     </div>
