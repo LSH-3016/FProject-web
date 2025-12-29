@@ -9,6 +9,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { summarizeJournalEntries, type SummaryResult } from "@/lib/bedrock";
 
 export const JournalBook = () => {
   const [entries, setEntries] = useState<Array<{ id: string; user_id: string; content: string; created_at: Date }>>([]);
@@ -18,6 +19,9 @@ export const JournalBook = () => {
   // 요약(Analysis) 관련 상태
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [dialogStep, setDialogStep] = useState<"confirm" | "loading" | "result">("confirm");
+  const [summaryResult, setSummaryResult] = useState<SummaryResult | null>(null);
+  const [summaryError, setSummaryError] = useState<string | null>(null);
+  const [loadingMessage, setLoadingMessage] = useState<string>("AI가 기록을 분석하고 있어요...");
 
   // 삭제 관련 상태
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -150,51 +154,88 @@ export const JournalBook = () => {
 
   const handleOpenAnalysis = () => {
     setDialogStep("confirm");
+    setSummaryResult(null);
+    setSummaryError(null);
+    setLoadingMessage("AI가 기록을 분석하고 있어요...");
     setIsDialogOpen(true);
   };
 
-  const proceedToResult = () => {
+  const proceedToResult = async () => {
     setDialogStep("loading");
-    setTimeout(() => {
+    setSummaryError(null);
+    
+    try {
+      // 로딩 메시지 업데이트
+      setLoadingMessage("API에서 일기 내용을 가져오는 중...");
+      
+      // 약간의 지연을 두어 사용자가 메시지를 볼 수 있도록
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      setLoadingMessage("AWS Bedrock에 연결하는 중...");
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
+      setLoadingMessage("Claude AI가 일기를 읽고 있어요...");
+      
+      // 실제 Bedrock API 호출 - 새로운 API 엔드포인트 사용
+      const result = await summarizeJournalEntries(currentUserId, API_BASE_URL);
+      
+      setLoadingMessage("요약을 완성하는 중...");
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
+      setSummaryResult(result);
       setDialogStep("result");
-    }, 2000);
+    } catch (error) {
+      console.error('요약 생성 실패:', error);
+      
+      // 에러 발생 시 폴백 요약 생성
+      const fallbackSummary = {
+        summary: `오늘 작성하신 기록들을 통해 당신의 하루를 엿볼 수 있었습니다. 
+
+각각의 순간들이 모여 당신만의 특별한 하루가 되었네요. 때로는 복잡한 감정들이 교차하기도 하지만, 그 모든 것이 지금의 당신을 만드는 소중한 경험들입니다.
+
+내일은 오늘보다 더 밝은 하루가 되기를 바랍니다. 당신의 이야기는 계속됩니다.
+
+※ AI 요약 서비스에 일시적인 문제가 있어 기본 메시지를 표시합니다.`
+      };
+      
+      setSummaryResult(fallbackSummary);
+      setSummaryError(`AI 요약 생성 중 오류가 발생했습니다: ${error instanceof Error ? error.message : '알 수 없는 오류'}`);
+      setDialogStep("result");
+    }
   };
 
   const saveToHistory = async () => {
+    if (!summaryResult) return;
+    
     try {
-      // 오늘의 모든 기록을 하나의 content로 합치기
-      const combinedContent = entries.map((entry, idx) => 
-        `${idx + 1}. ${entry.content}`
-      ).join('\n\n');
+      // 새로운 API에서 상세 기록 가져오기
+      const response = await fetch(`${API_BASE_URL}/messages/content?user_id=${currentUserId}&limit=100&offset=0`);
+      
+      if (!response.ok) {
+        throw new Error(`API 호출 실패: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      const combinedContent = data.contents;
 
-      // 요약 결과도 포함 (실제로는 AI 요약 결과를 사용)
-      const summaryText = `오늘의 기록에서는 잔잔한 평온함이 느껴집니다. 
-과거를 그리워하는 마음과 함께, 고요한 쓸쓸함도 함께 담겨 있네요. 
+      const fullContent = `[요약]\n${summaryResult.summary}\n\n[상세 기록]\n${combinedContent}`;
 
-이 모든 감정이 모여 당신만의 하루가 됩니다. 
-때로는 지나간 추억이 아프게 다가오기도 하지만, 그것 또한 지금의 나를 만든 소중한 조각들입니다.
-
-내일은 오늘보다 조금 더 따뜻한 하루가 되기를 바랍니다.
-당신의 이야기는 여기서 끝이 아닙니다. 계속해서 써내려가세요.`;
-
-      const fullContent = `[요약]\n${summaryText}\n\n[상세 기록]\n${combinedContent}`;
-
-      const response = await fetch(`${API_BASE_URL}/history`, {
+      const historyResponse = await fetch(`${API_BASE_URL}/history`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           username: currentUserId,
           content: fullContent,
           record_date: new Date().toISOString().split('T')[0], // YYYY-MM-DD 형식
-          tags: mockEmotions.map(e => e.label) // ["평온", "그리움", "쓸쓸함"]
+          tags: [] // 감정 태그 제거
         })
       });
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+      if (!historyResponse.ok) {
+        throw new Error(`HTTP error! status: ${historyResponse.status}`);
       }
 
-      const savedHistory = await response.json();
+      const savedHistory = await historyResponse.json();
       console.log('히스토리 저장 완료:', savedHistory);
       
       alert('히스토리에 성공적으로 등록되었습니다!');
@@ -206,11 +247,7 @@ export const JournalBook = () => {
     }
   };
 
-  const mockEmotions = [
-    { type: "positive" as const, label: "평온", percentage: 45 },
-    { type: "neutral" as const, label: "그리움", percentage: 35 },
-    { type: "negative" as const, label: "쓸쓸함", percentage: 20 },
-  ];
+  // 기본 감정 데이터 제거 (더 이상 사용하지 않음)
 
   const defaultScrollbarStyle = `
     pr-2 overflow-y-auto
@@ -376,7 +413,12 @@ export const JournalBook = () => {
                   기록 요약
                 </DialogTitle>
                 <DialogDescription className="text-base pt-2">
-                  오늘 작성하신 {entries.length}개의 기록을 바탕으로 요약을 진행할까요?
+                  오늘 작성하신 {entries.length}개의 기록을 바탕으로 AI가 요약을 진행할까요?
+                  {summaryError && (
+                    <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded text-red-600 text-sm">
+                      {summaryError}
+                    </div>
+                  )}
                 </DialogDescription>
               </DialogHeader>
               <DialogFooter className="gap-2 sm:gap-0 mt-4">
@@ -398,8 +440,9 @@ export const JournalBook = () => {
                 <Sparkles className="w-4 h-4 text-primary absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 opacity-50 animate-pulse" />
               </div>
               <div className="text-center space-y-1">
-                <p className="text-lg font-medium font-display text-foreground">기록을 읽고 있어요...</p>
+                <p className="text-lg font-medium font-display text-foreground">{loadingMessage}</p>
                 <p className="text-sm text-muted-foreground animate-pulse">당신의 소중한 하루를 정리하는 중입니다.</p>
+                <p className="text-xs text-muted-foreground/70 mt-2">잠시만 기다려주세요. 보통 10-30초 정도 소요됩니다.</p>
               </div>
             </div>
           )}
@@ -418,15 +461,11 @@ export const JournalBook = () => {
                         year: "numeric", month: "long", day: "numeric", weekday: "long",
                       })}
                     </h3>
-                    <div className="flex items-center gap-2 mt-2">
-                        {mockEmotions.map((e, i) => (
-                          <span key={i} className={`text-xs px-2 py-0.5 rounded-full border ${
-                            i === 0 ? "border-rose-300 text-rose-600 bg-rose-50" : "border-stone-300 text-stone-500"
-                          }`}>
-                            #{e.label}
-                          </span>
-                        ))}
-                    </div>
+                    {summaryError && (
+                      <div className="mt-2 p-2 bg-amber-50 border border-amber-200 rounded text-amber-700 text-xs">
+                        {summaryError}
+                      </div>
+                    )}
                   </div>
 
                   <div className={`flex-1 ${paperScrollbarStyle}`} style={{ marginTop: '10px' }}>
@@ -434,14 +473,7 @@ export const JournalBook = () => {
                       className="font-handwriting text-xl text-stone-800 tracking-wide whitespace-pre-wrap min-h-full"
                       style={linedPaperStyle}
                     >
-                      오늘의 기록에서는 잔잔한 평온함이 느껴집니다. 
-                      과거를 그리워하는 마음과 함께, 고요한 쓸쓸함도 함께 담겨 있네요. 
-                      
-                      이 모든 감정이 모여 당신만의 하루가 됩니다. 
-                      때로는 지나간 추억이 아프게 다가오기도 하지만, 그것 또한 지금의 나를 만든 소중한 조각들입니다.
-                      
-                      내일은 오늘보다 조금 더 따뜻한 하루가 되기를 바랍니다.
-                      당신의 이야기는 여기서 끝이 아닙니다. 계속해서 써내려가세요.
+                      {summaryResult?.summary || "요약을 불러오는 중입니다..."}
                     </div>
                   </div>
 
