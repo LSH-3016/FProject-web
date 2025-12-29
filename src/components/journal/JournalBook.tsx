@@ -48,13 +48,18 @@ export const JournalBook = () => {
   const loadUserEntries = async () => {
     setIsLoadingEntries(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/users/${currentUserId}/messages?limit=100&offset=0`);
+      // 올바른 API 엔드포인트 사용 (/messages?user_id=...)
+      const apiUrl = `${API_BASE_URL}/messages?user_id=${currentUserId}&limit=100&offset=0`;
+      console.log('API 호출 시도:', apiUrl);
+      
+      const response = await fetch(apiUrl);
       
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        throw new Error(`HTTP error! status: ${response.status}, statusText: ${response.statusText}`);
       }
       
       const messages = await response.json();
+      console.log('API 응답 성공:', messages.length, '개의 메시지');
       
       // API 응답의 created_at을 Date 객체로 변환
       const formattedMessages = messages.map((msg: any) => ({
@@ -66,7 +71,6 @@ export const JournalBook = () => {
       
     } catch (error) {
       console.error("기록 로드 실패:", error);
-      // 개발 중에는 빈 배열로 시작
       setEntries([]);
     } finally {
       setIsLoadingEntries(false);
@@ -166,17 +170,17 @@ export const JournalBook = () => {
     
     try {
       // 로딩 메시지 업데이트
-      setLoadingMessage("API에서 일기 내용을 가져오는 중...");
+      setLoadingMessage("백엔드 API에 연결하는 중...");
       
       // 약간의 지연을 두어 사용자가 메시지를 볼 수 있도록
       await new Promise(resolve => setTimeout(resolve, 500));
       
-      setLoadingMessage("AWS Bedrock에 연결하는 중...");
+      setLoadingMessage("사용자 메시지를 가져오는 중...");
       await new Promise(resolve => setTimeout(resolve, 300));
       
-      setLoadingMessage("Claude AI가 일기를 읽고 있어요...");
+      setLoadingMessage("AI가 일기를 분석하고 있어요...");
       
-      // 실제 Bedrock API 호출 - 새로운 API 엔드포인트 사용
+      // FastAPI 백엔드의 요약 API 호출
       const result = await summarizeJournalEntries(currentUserId, API_BASE_URL);
       
       setLoadingMessage("요약을 완성하는 중...");
@@ -208,7 +212,7 @@ export const JournalBook = () => {
     if (!summaryResult) return;
     
     try {
-      // 새로운 API에서 상세 기록 가져오기
+      // 백엔드 API에서 상세 기록 가져오기
       const response = await fetch(`${API_BASE_URL}/messages/content?user_id=${currentUserId}&limit=100&offset=0`);
       
       if (!response.ok) {
@@ -478,7 +482,7 @@ export const JournalBook = () => {
                   </div>
 
                   <div className="shrink-0 pt-4 mt-2 border-t border-stone-300/50 flex items-center justify-between text-stone-500 text-sm font-serif">
-                    <span>총 {entries.length}개의 기록</span>
+                    <span>총 {summaryResult?.message_count || entries.length}개의 기록</span>
                     <div className="flex gap-2">
                       <Button variant="ghost" size="sm" onClick={() => setIsDialogOpen(false)} className="hover:bg-stone-200/50 hover:text-stone-800">
                         덮기
