@@ -43,7 +43,7 @@ export const JournalBook = () => {
   const [isLoadingEntries, setIsLoadingEntries] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const currentUserId = "user_001"; // 실제로는 인증된 사용자 ID를 사용
-  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
+  const API_BASE_URL = import.meta.env.VITE_JOURNAL_API_URL || "http://localhost:8000";
 
   useEffect(() => {
     if (entriesContainerRef.current) {

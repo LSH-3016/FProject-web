@@ -8,7 +8,7 @@ import { AddItemModal } from "@/components/library/AddItemModal";
 import { useLibraryContext } from "@/contexts/LibraryContext";
 import { libraryTypeConfigs } from "@/data/libraryMockData";
 import { LibraryItem, LibraryItemType, LibraryItemVisibility } from "@/types/library";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 const LibraryDetailPage = () => {
   const { type } = useParams<{ type: string }>();
@@ -70,12 +70,8 @@ const LibraryDetailPage = () => {
     setSelectedIds([]);
   };
 
-  const handleAddItem = (item: { name: string; visibility: LibraryItemVisibility }) => {
-    addItem({
-      name: item.name,
-      type: itemType,
-      visibility: item.visibility,
-    });
+  const handleAddItem = (item: LibraryItem) => {
+    addItem(item);
   };
 
   const handleOpenPreview = (item: LibraryItem) => {
@@ -223,6 +219,9 @@ const LibraryDetailPage = () => {
 
       <Dialog open={!!previewItem} onOpenChange={() => setPreviewItem(null)}>
         <DialogContent className="max-w-4xl p-0 overflow-hidden">
+          <DialogHeader className="sr-only">
+            <DialogTitle>{previewItem?.name || "미리보기"}</DialogTitle>
+          </DialogHeader>
           {previewItem?.thumbnail ? (
             <img
               src={previewItem.thumbnail}

@@ -8,6 +8,7 @@ import { useLibraryContext } from "@/contexts/LibraryContext";
 import { libraryTypeConfigs } from "@/data/libraryMockData";
 import { LibraryItemType, LibraryItemVisibility } from "@/types/library";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { AddItemModal } from "@/components/library/AddItemModal";
 
 const getIcon = (type: "image" | "document" | "video" | "file") => {
   switch (type) {
@@ -25,6 +26,8 @@ const getIcon = (type: "image" | "document" | "video" | "file") => {
 const LibraryPage = () => {
   const [isUploadMenuOpen, setIsUploadMenuOpen] = useState(false);
   const [openItemMenuId, setOpenItemMenuId] = useState<string | null>(null);
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [selectedUploadType, setSelectedUploadType] = useState<LibraryItemType | null>(null);
   const [visibilityModal, setVisibilityModal] = useState<{
     isOpen: boolean;
     type: LibraryItemType | null;
@@ -36,9 +39,16 @@ const LibraryPage = () => {
   });
   const uploadMenuRef = useRef<HTMLDivElement | null>(null);
   const navigate = useNavigate();
-  const { getLatestItemByType, getItemCountByType, getItemsByType } = useLibraryContext();
+  const { getLatestItemByType, getItemCountByType, getItemsByType, addItem } = useLibraryContext();
 
-  const formatDate = (date: Date) => {
+  const formatDate = (value?: string | Date) => {
+    if (!value) {
+      return "날짜 없음";
+    }
+    const date = value instanceof Date ? value : new Date(value);
+    if (Number.isNaN(date.getTime())) {
+      return "날짜 없음";
+    }
     const year = date.getFullYear();
     const month = `${date.getMonth() + 1}`.padStart(2, "0");
     const day = `${date.getDate()}`.padStart(2, "0");
@@ -96,9 +106,21 @@ const LibraryPage = () => {
     };
   }, [openItemMenuId]);
 
-  const handleUploadClick = (target: "video" | "image" | "document" | "file") => {
+  const handleUploadClick = (target: LibraryItemType) => {
     setIsUploadMenuOpen(false);
-    // TODO: 실제 업로드 로직을 연결하세요.
+    setSelectedUploadType(target);
+    setIsAddModalOpen(true);
+  };
+
+  const handleAddItem = (item: any) => {
+    addItem(item);
+    setIsAddModalOpen(false);
+    setSelectedUploadType(null);
+  };
+
+  const getTypeLabel = (type: LibraryItemType): string => {
+    const config = libraryTypeConfigs.find(c => c.type === type);
+    return config?.label || type;
   };
   const handleVisibilityOpen = (type: LibraryItemType, visibility: LibraryItemVisibility) => {
     // 공개 상태별 목록을 팝업으로 표시.
@@ -359,6 +381,20 @@ const LibraryPage = () => {
               </div>
             </DialogContent>
           </Dialog>
+
+          {/* AddItemModal for file upload */}
+          {selectedUploadType && (
+            <AddItemModal
+              isOpen={isAddModalOpen}
+              onClose={() => {
+                setIsAddModalOpen(false);
+                setSelectedUploadType(null);
+              }}
+              itemType={selectedUploadType}
+              typeLabel={getTypeLabel(selectedUploadType)}
+              onAdd={handleAddItem}
+            />
+          )}
         </div>
       </div>
     </MainLayout>

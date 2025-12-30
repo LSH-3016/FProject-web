@@ -1,27 +1,59 @@
-import { createContext, useCallback, useContext, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useMemo, useState, useEffect } from "react";
 import { LibraryItem, LibraryItemType, LibraryItemVisibility } from "@/types/library";
 import { initialMockItems } from "@/data/libraryMockData";
+import { apiService } from "@/services/api";
 
 interface LibraryContextType {
   items: LibraryItem[];
+  loading: boolean;
+  error: string | null;
   getItemsByType: (type: LibraryItemType) => LibraryItem[];
   getLatestItemByType: (type: LibraryItemType) => LibraryItem | null;
   getItemCountByType: (type: LibraryItemType) => number;
   updateItemsVisibility: (itemIds: string[], visibility: LibraryItemVisibility) => void;
   deleteItems: (itemIds: string[]) => void;
-  addItem: (item: Omit<LibraryItem, "id" | "createdAt">) => void;
+  addItem: (item: LibraryItem) => void;
+  refreshItems: () => Promise<void>;
 }
 
 const LibraryContext = createContext<LibraryContextType | undefined>(undefined);
 
 export function LibraryProvider({ children }: { children: React.ReactNode }) {
   const [items, setItems] = useState<LibraryItem[]>(initialMockItems);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // 아이템 목록 새로고침
+  const refreshItems = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      // API에서 사용자의 라이브러리 아이템 조회
+      const { items: fetchedItems } = await apiService.getMyLibraryItems(1, 100);
+      setItems(fetchedItems);
+    } catch (err) {
+      console.error("라이브러리 아이템 조회 실패:", err);
+      setError(err instanceof Error ? err.message : "아이템을 불러오는데 실패했습니다");
+      
+      // 에러 시 로컬 더미 데이터 사용 (개발용)
+      setItems(initialMockItems);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // 컴포넌트 마운트 시 아이템 로드
+  useEffect(() => {
+    // 실제 API 사용 (개발/운영 모두)
+    refreshItems();
+  }, [refreshItems]);
 
   const getItemsByType = useCallback(
     (type: LibraryItemType) =>
       items
         .filter((item) => item.type === type)
-        .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()),
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
     [items]
   );
 
@@ -39,47 +71,68 @@ export function LibraryProvider({ children }: { children: React.ReactNode }) {
   );
 
   const updateItemsVisibility = useCallback(
-    (itemIds: string[], visibility: LibraryItemVisibility) => {
-      // 여러 항목을 한 번에 공개 상태 변경.
-      setItems((prev) =>
-        prev.map((item) => (itemIds.includes(item.id) ? { ...item, visibility } : item))
-      );
+    async (itemIds: string[], visibility: LibraryItemVisibility) => {
+      try {
+        // API 호출 (개발/운영 모두)
+        for (const itemId of itemIds) {
+          await apiService.updateLibraryItem(itemId, { visibility });
+        }
+        
+        // 로컬 상태 업데이트
+        setItems((prev) =>
+          prev.map((item) => (itemIds.includes(item.id) ? { ...item, visibility } : item))
+        );
+      } catch (err) {
+        console.error("아이템 공개 상태 변경 실패:", err);
+        throw err;
+      }
     },
     []
   );
 
-  const deleteItems = useCallback((itemIds: string[]) => {
-    // 선택된 항목만 제거.
-    setItems((prev) => prev.filter((item) => !itemIds.includes(item.id)));
+  const deleteItems = useCallback(async (itemIds: string[]) => {
+    try {
+      // API 호출 (개발/운영 모두)
+      for (const itemId of itemIds) {
+        await apiService.deleteLibraryItem(itemId);
+      }
+      
+      // 로컬 상태에서 제거
+      setItems((prev) => prev.filter((item) => !itemIds.includes(item.id)));
+    } catch (err) {
+      console.error("아이템 삭제 실패:", err);
+      throw err;
+    }
   }, []);
 
-  const addItem = useCallback((item: Omit<LibraryItem, "id" | "createdAt">) => {
-    const newItem: LibraryItem = {
-      ...item,
-      id: `${item.type}-${Date.now()}`,
-      createdAt: new Date(),
-    };
-    setItems((prev) => [newItem, ...prev]);
+  const addItem = useCallback((item: LibraryItem) => {
+    setItems((prev) => [item, ...prev]);
   }, []);
 
   const value = useMemo(
     () => ({
       items,
+      loading,
+      error,
       getItemsByType,
       getLatestItemByType,
       getItemCountByType,
       updateItemsVisibility,
       deleteItems,
       addItem,
+      refreshItems,
     }),
     [
       items,
+      loading,
+      error,
       getItemsByType,
       getLatestItemByType,
       getItemCountByType,
       updateItemsVisibility,
       deleteItems,
       addItem,
+      refreshItems,
     ]
   );
 
