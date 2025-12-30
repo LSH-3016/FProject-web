@@ -27,6 +27,18 @@ export const JournalBook = () => {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [deleteTargetIndex, setDeleteTargetIndex] = useState<number | null>(null);
 
+  // 히스토리 덮어쓰기 확인 관련 상태
+  const [isOverwriteDialogOpen, setIsOverwriteDialogOpen] = useState(false);
+  const [existingHistoryDate, setExistingHistoryDate] = useState<string | null>(null);
+  const [existingHistoryId, setExistingHistoryId] = useState<string | null>(null);
+
+  // 히스토리 저장 완료 알림 상태
+  const [isSuccessDialogOpen, setIsSuccessDialogOpen] = useState(false);
+
+  // 에러 다이얼로그 상태
+  const [isErrorDialogOpen, setIsErrorDialogOpen] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string>("");
+
   // API 관련 상태
   const [isLoadingEntries, setIsLoadingEntries] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -67,7 +79,20 @@ export const JournalBook = () => {
         created_at: new Date(msg.created_at)
       }));
       
-      setEntries(formattedMessages);
+      // 오늘 날짜의 메시지만 필터링
+      const today = new Date();
+      today.setHours(0, 0, 0, 0); // 오늘 00:00:00
+      
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1); // 내일 00:00:00
+      
+      const todayMessages = formattedMessages.filter((msg: any) => {
+        const msgDate = new Date(msg.created_at);
+        return msgDate >= today && msgDate < tomorrow;
+      });
+      
+      console.log('오늘 날짜 메시지:', todayMessages.length, '개');
+      setEntries(todayMessages);
       
     } catch (error) {
       console.error("기록 로드 실패:", error);
@@ -108,7 +133,8 @@ export const JournalBook = () => {
       
     } catch (error) {
       console.error("기록 저장 실패:", error);
-      alert("기록 저장에 실패했습니다. 다시 시도해주세요.");
+      setErrorMessage("기록 저장에 실패했습니다. 다시 시도해주세요.");
+      setIsErrorDialogOpen(true);
     } finally {
       setIsSaving(false);
     }
@@ -128,7 +154,8 @@ export const JournalBook = () => {
       
     } catch (error) {
       console.error("기록 삭제 실패:", error);
-      alert("기록 삭제에 실패했습니다. 다시 시도해주세요.");
+      setErrorMessage("기록 삭제에 실패했습니다. 다시 시도해주세요.");
+      setIsErrorDialogOpen(true);
     }
   };
 
@@ -193,13 +220,7 @@ export const JournalBook = () => {
       
       // 에러 발생 시 폴백 요약 생성
       const fallbackSummary = {
-        summary: `오늘 작성하신 기록들을 통해 당신의 하루를 엿볼 수 있었습니다. 
-
-각각의 순간들이 모여 당신만의 특별한 하루가 되었네요. 때로는 복잡한 감정들이 교차하기도 하지만, 그 모든 것이 지금의 당신을 만드는 소중한 경험들입니다.
-
-내일은 오늘보다 더 밝은 하루가 되기를 바랍니다. 당신의 이야기는 계속됩니다.
-
-※ AI 요약 서비스에 일시적인 문제가 있어 기본 메시지를 표시합니다.`
+        summary: ` ※ AI 요약 서비스에 일시적인 문제가 있어 기본 메시지를 표시합니다. `
       };
       
       setSummaryResult(fallbackSummary);
@@ -208,7 +229,40 @@ export const JournalBook = () => {
     }
   };
 
-  const saveToHistory = async () => {
+  const checkAndSaveToHistory = async () => {
+    if (!summaryResult) return;
+    
+    try {
+      // 오늘 날짜의 히스토리가 이미 존재하는지 확인
+      const todayDate = new Date().toISOString().split('T')[0];
+      const checkResponse = await fetch(`${API_BASE_URL}/summary/check/${currentUserId}`);
+      
+      if (!checkResponse.ok) {
+        throw new Error(`히스토리 확인 실패: ${checkResponse.status}`);
+      }
+      
+      const checkData = await checkResponse.json();
+      
+      // 이미 오늘 날짜의 히스토리가 존재하는 경우
+      if (checkData.exists) {
+        setExistingHistoryDate(checkData.record_date);
+        // 기존 히스토리 ID 저장 (API 응답에 id가 있다고 가정)
+        setExistingHistoryId(checkData.id || null);
+        setIsOverwriteDialogOpen(true);
+        return;
+      }
+      
+      // 존재하지 않으면 바로 저장
+      await performSaveToHistory(false);
+      
+    } catch (error) {
+      console.error("히스토리 확인 실패:", error);
+      setErrorMessage("히스토리 확인에 실패했습니다. 다시 시도해주세요.");
+      setIsErrorDialogOpen(true);
+    }
+  };
+
+  const performSaveToHistory = async (isOverwrite: boolean = false) => {
     if (!summaryResult) return;
     
     try {
@@ -224,16 +278,33 @@ export const JournalBook = () => {
 
       const fullContent = `[요약]\n${summaryResult.summary}\n\n[상세 기록]\n${combinedContent}`;
 
-      const historyResponse = await fetch(`${API_BASE_URL}/history`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          username: currentUserId,
-          content: fullContent,
-          record_date: new Date().toISOString().split('T')[0], // YYYY-MM-DD 형식
-          tags: [] // 감정 태그 제거
-        })
-      });
+      let historyResponse;
+      
+      if (isOverwrite && existingHistoryId) {
+        // 덮어쓰기: PUT 요청으로 기존 히스토리 업데이트
+        historyResponse = await fetch(`${API_BASE_URL}/history/${existingHistoryId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            username: currentUserId,
+            content: fullContent,
+            record_date: new Date().toISOString().split('T')[0],
+            tags: []
+          })
+        });
+      } else {
+        // 새로 저장: POST 요청
+        historyResponse = await fetch(`${API_BASE_URL}/history`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            username: currentUserId,
+            content: fullContent,
+            record_date: new Date().toISOString().split('T')[0],
+            tags: []
+          })
+        });
+      }
 
       if (!historyResponse.ok) {
         throw new Error(`HTTP error! status: ${historyResponse.status}`);
@@ -242,12 +313,15 @@ export const JournalBook = () => {
       const savedHistory = await historyResponse.json();
       console.log('히스토리 저장 완료:', savedHistory);
       
-      alert('히스토리에 성공적으로 등록되었습니다!');
+      // 성공 다이얼로그 표시
       setIsDialogOpen(false);
+      setIsOverwriteDialogOpen(false);
+      setIsSuccessDialogOpen(true);
       
     } catch (error) {
       console.error("히스토리 저장 실패:", error);
-      alert("히스토리 저장에 실패했습니다. 다시 시도해주세요.");
+      setErrorMessage("히스토리 저장에 실패했습니다. 다시 시도해주세요.");
+      setIsErrorDialogOpen(true);
     }
   };
 
@@ -400,6 +474,116 @@ export const JournalBook = () => {
         </DialogContent>
       </Dialog>
 
+      {/* 히스토리 덮어쓰기 확인 팝업 */}
+      <Dialog open={isOverwriteDialogOpen} onOpenChange={setIsOverwriteDialogOpen}>
+        <DialogContent className="sm:max-w-md bg-card/95 backdrop-blur-md border border-primary/10 shadow-xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-amber-600">
+              <HelpCircle className="w-5 h-5" />
+              히스토리 덮어쓰기
+            </DialogTitle>
+            <DialogDescription className="pt-2">
+              {existingHistoryDate && (
+                <>
+                  <span className="font-semibold text-foreground">
+                    {new Date(existingHistoryDate).toLocaleDateString("ko-KR", {
+                      year: "numeric",
+                      month: "long",
+                      day: "numeric"
+                    })}
+                  </span>
+                  에 이미 저장된 히스토리가 있습니다.
+                  <br/><br/>
+                  기존 내용을 덮어쓰시겠습니까?
+                  <br/>
+                  <span className="text-amber-600 text-sm">덮어쓴 내용은 복구할 수 없습니다.</span>
+                </>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0 mt-4">
+            <Button variant="outline" onClick={() => setIsOverwriteDialogOpen(false)}>
+              취소
+            </Button>
+            <Button 
+              variant="default" 
+              onClick={() => performSaveToHistory(true)}
+              className="bg-amber-600 hover:bg-amber-700 text-white"
+            >
+              네, 덮어쓸래요
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 히스토리 저장 완료 팝업 */}
+      <Dialog open={isSuccessDialogOpen} onOpenChange={setIsSuccessDialogOpen}>
+        <DialogContent className="sm:max-w-md bg-card/95 backdrop-blur-md border border-primary/10 shadow-xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-green-600">
+              <Sparkles className="w-5 h-5" />
+              저장 완료
+            </DialogTitle>
+            <DialogDescription className="pt-4 pb-2">
+              <div className="flex flex-col items-center gap-3">
+                <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center animate-in zoom-in-95 duration-300">
+                  <Sparkles className="w-8 h-8 text-green-600" />
+                </div>
+                <p className="text-center text-base text-foreground font-medium">
+                  히스토리에 성공적으로 등록되었습니다!
+                </p>
+                <p className="text-center text-sm text-muted-foreground">
+                  오늘의 소중한 기록이 저장되었어요.
+                </p>
+              </div>
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="mt-2">
+            <Button 
+              variant="default" 
+              onClick={() => setIsSuccessDialogOpen(false)}
+              className="w-full bg-primary hover:bg-primary/90"
+            >
+              확인
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 에러 팝업 */}
+      <Dialog open={isErrorDialogOpen} onOpenChange={setIsErrorDialogOpen}>
+        <DialogContent className="sm:max-w-md bg-card/95 backdrop-blur-md border border-red-200 shadow-xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-600">
+              <X className="w-5 h-5" />
+              오류 발생
+            </DialogTitle>
+            <DialogDescription className="pt-4 pb-2">
+              <div className="flex flex-col items-center gap-3">
+                <div className="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center animate-in zoom-in-95 duration-300">
+                  <X className="w-8 h-8 text-red-600" />
+                </div>
+                <p className="text-center text-base text-foreground font-medium">
+                  {errorMessage}
+                </p>
+                <p className="text-center text-sm text-muted-foreground">
+                  잠시 후 다시 시도해주세요.
+                </p>
+              </div>
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="mt-2">
+            <Button 
+              variant="default" 
+              onClick={() => setIsErrorDialogOpen(false)}
+              className="w-full bg-red-600 hover:bg-red-700 text-white"
+            >
+              확인
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* 기존 요약 팝업 (Dialog) */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent 
@@ -490,7 +674,7 @@ export const JournalBook = () => {
                       <Button 
                         variant="default" 
                         size="sm" 
-                        onClick={saveToHistory}
+                        onClick={checkAndSaveToHistory}
                         className="bg-stone-800 text-[#fdfbf7] hover:bg-stone-700 shadow-sm font-sans"
                       >
                         히스토리에 등록
