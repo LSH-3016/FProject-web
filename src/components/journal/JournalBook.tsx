@@ -1,5 +1,5 @@
 import { useState, KeyboardEvent, useEffect, useRef } from "react";
-import { Send, Sparkles, Feather, HelpCircle, Loader2, X, Trash2 } from "lucide-react";
+import { Send, Sparkles, Feather, HelpCircle, Loader2, X, Trash2, Paperclip, Image } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -10,6 +10,8 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { summarizeJournalEntries, type SummaryResult } from "@/lib/bedrock";
+import { AddItemModal } from "@/components/library/AddItemModal";
+import { LibraryItemType } from "@/types/library";
 
 export const JournalBook = () => {
   const [entries, setEntries] = useState<Array<{ id: string; user_id: string; content: string; created_at: Date }>>([]);
@@ -39,11 +41,22 @@ export const JournalBook = () => {
   const [isErrorDialogOpen, setIsErrorDialogOpen] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string>("");
 
+  // 파일 업로드 관련 상태
+  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+  const [selectedUploadType, setSelectedUploadType] = useState<LibraryItemType | null>(null);
+  const [isUploadMenuOpen, setIsUploadMenuOpen] = useState(false);
+  const uploadMenuRef = useRef<HTMLDivElement | null>(null);
+  
+  // 요약 화면에서 선택한 사진 임시 저장 (하나만)
+  const [selectedImage, setSelectedImage] = useState<File | null>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+
   // API 관련 상태
   const [isLoadingEntries, setIsLoadingEntries] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const currentUserId = "user_001"; // 실제로는 인증된 사용자 ID를 사용
+  const currentUserId = "test_user"; // 실제로는 인증된 사용자 ID를 사용
   const API_BASE_URL = import.meta.env.VITE_JOURNAL_API_URL || "http://localhost:8000";
+  const LIBRARY_API_URL = import.meta.env.VITE_LIBRARY_API_URL || "http://192.168.0.138:8000/api/v1";
 
   useEffect(() => {
     if (entriesContainerRef.current) {
@@ -55,6 +68,23 @@ export const JournalBook = () => {
   useEffect(() => {
     loadUserEntries();
   }, []);
+
+  // 파일 업로드 메뉴 외부 클릭 감지
+  useEffect(() => {
+    if (!isUploadMenuOpen) return;
+
+    const handleClickOutside = (event: MouseEvent) => {
+      if (!uploadMenuRef.current) return;
+      if (!uploadMenuRef.current.contains(event.target as Node)) {
+        setIsUploadMenuOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [isUploadMenuOpen]);
 
   // API 함수들
   const loadUserEntries = async () => {
@@ -79,16 +109,20 @@ export const JournalBook = () => {
         created_at: new Date(msg.created_at)
       }));
       
-      // 오늘 날짜의 메시지만 필터링
+      // 오늘 날짜 (로컬 시간대 기준으로 YYYY-MM-DD 형식)
       const today = new Date();
-      today.setHours(0, 0, 0, 0); // 오늘 00:00:00
+      const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
       
-      const tomorrow = new Date(today);
-      tomorrow.setDate(tomorrow.getDate() + 1); // 내일 00:00:00
+      console.log('오늘 날짜 (로컬):', todayStr);
       
       const todayMessages = formattedMessages.filter((msg: any) => {
         const msgDate = new Date(msg.created_at);
-        return msgDate >= today && msgDate < tomorrow;
+        // 로컬 시간대 기준으로 날짜 추출
+        const msgDateStr = `${msgDate.getFullYear()}-${String(msgDate.getMonth() + 1).padStart(2, '0')}-${String(msgDate.getDate()).padStart(2, '0')}`;
+        
+        console.log('메시지 날짜 (로컬):', msgDateStr, '원본:', msg.created_at, '내용:', msg.content.substring(0, 20));
+        
+        return msgDateStr === todayStr;
       });
       
       console.log('오늘 날짜 메시지:', todayMessages.length, '개');
@@ -188,7 +222,24 @@ export const JournalBook = () => {
     setSummaryResult(null);
     setSummaryError(null);
     setLoadingMessage("AI가 기록을 분석하고 있어요...");
+    setSelectedImage(null); // 요약 시작 시 선택된 사진 초기화
     setIsDialogOpen(true);
+  };
+
+  // 사진 선택 핸들러 (하나만)
+  const handleImageSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      setSelectedImage(file);
+    }
+  };
+
+  // 선택된 사진 제거
+  const handleRemoveImage = () => {
+    setSelectedImage(null);
+    if (imageInputRef.current) {
+      imageInputRef.current.value = '';
+    }
   };
 
   const proceedToResult = async () => {
@@ -207,8 +258,12 @@ export const JournalBook = () => {
       
       setLoadingMessage("AI가 일기를 분석하고 있어요...");
       
-      // FastAPI 백엔드의 요약 API 호출
-      const result = await summarizeJournalEntries(currentUserId, API_BASE_URL);
+      // 오늘 날짜로 요약 API 호출 (로컬 시간대 기준)
+      const today = new Date();
+      const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+      console.log('요약 API 호출 - 날짜 (로컬):', todayStr, '사용자:', currentUserId);
+      
+      const result = await summarizeJournalEntries(currentUserId, API_BASE_URL, todayStr);
       
       setLoadingMessage("요약을 완성하는 중...");
       await new Promise(resolve => setTimeout(resolve, 300));
@@ -266,7 +321,43 @@ export const JournalBook = () => {
     if (!summaryResult) return;
     
     try {
-      // 백엔드 API에서 상세 기록 가져오기
+      // 1. 선택된 사진이 있으면 먼저 업로드하고 S3 Key 받기
+      let s3Key: string | null = null;
+      
+      if (selectedImage) {
+        console.log('사진 업로드 시작:', selectedImage.name);
+        
+        try {
+          const formData = new FormData();
+          formData.append('file', selectedImage);
+          formData.append('name', selectedImage.name.replace(/\.[^/.]+$/, '')); // 확장자 제거
+          formData.append('visibility', 'private');
+          
+          // 사진 업로드 API 호출
+          const uploadResponse = await fetch(`${LIBRARY_API_URL}/upload/upload-and-get-url`, {
+            method: 'POST',
+            body: formData
+          });
+          
+          if (uploadResponse.ok) {
+            const uploadResult = await uploadResponse.json();
+            // API 응답 구조: { data: { s3_key: "...", item_id: "...", ... }, message: "..." }
+            s3Key = uploadResult.data?.s3_key || null;
+            if (s3Key) {
+              console.log('사진 업로드 성공:', selectedImage.name, '-> S3 Key:', s3Key);
+            } else {
+              console.error('S3 Key를 받지 못했습니다:', uploadResult);
+            }
+          } else {
+            const errorData = await uploadResponse.json().catch(() => ({}));
+            console.error('사진 업로드 실패:', selectedImage.name, errorData);
+          }
+        } catch (uploadError) {
+          console.error('사진 업로드 중 오류:', uploadError);
+        }
+      }
+      
+      // 2. 백엔드 API에서 상세 기록 가져오기
       const response = await fetch(`${API_BASE_URL}/messages/content?user_id=${currentUserId}&limit=100&offset=0`);
       
       if (!response.ok) {
@@ -278,31 +369,30 @@ export const JournalBook = () => {
 
       const fullContent = `[요약]\n${summaryResult.summary}\n\n[상세 기록]\n${combinedContent}`;
 
+      // 3. 히스토리 저장 (s3_key 포함)
       let historyResponse;
+      
+      const historyData = {
+        user_id: currentUserId,
+        content: fullContent,
+        record_date: new Date().toISOString().split('T')[0],
+        tags: [],
+        ...(s3Key && { s3_key: s3Key }) // s3_key가 있을 때만 포함
+      };
       
       if (isOverwrite && existingHistoryId) {
         // 덮어쓰기: PUT 요청으로 기존 히스토리 업데이트
         historyResponse = await fetch(`${API_BASE_URL}/history/${existingHistoryId}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            username: currentUserId,
-            content: fullContent,
-            record_date: new Date().toISOString().split('T')[0],
-            tags: []
-          })
+          body: JSON.stringify(historyData)
         });
       } else {
         // 새로 저장: POST 요청
         historyResponse = await fetch(`${API_BASE_URL}/history`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            username: currentUserId,
-            content: fullContent,
-            record_date: new Date().toISOString().split('T')[0],
-            tags: []
-          })
+          body: JSON.stringify(historyData)
         });
       }
 
@@ -312,6 +402,12 @@ export const JournalBook = () => {
 
       const savedHistory = await historyResponse.json();
       console.log('히스토리 저장 완료:', savedHistory);
+      if (s3Key) {
+        console.log('첨부된 S3 Key:', s3Key);
+      }
+      
+      // 업로드 완료 후 선택된 사진 초기화
+      setSelectedImage(null);
       
       // 성공 다이얼로그 표시
       setIsDialogOpen(false);
@@ -323,6 +419,30 @@ export const JournalBook = () => {
       setErrorMessage("히스토리 저장에 실패했습니다. 다시 시도해주세요.");
       setIsErrorDialogOpen(true);
     }
+  };
+
+  // 파일 업로드 핸들러
+  const handleUploadClick = (type: LibraryItemType) => {
+    setSelectedUploadType(type);
+    setIsUploadMenuOpen(false);
+    setIsUploadModalOpen(true);
+  };
+
+  const handleAddItem = (item: any) => {
+    console.log('파일 업로드 완료:', item);
+    // 여기서 필요한 경우 추가 처리를 할 수 있습니다
+    setIsUploadModalOpen(false);
+    setSelectedUploadType(null);
+  };
+
+  const getTypeLabel = (type: LibraryItemType): string => {
+    const labels: Record<LibraryItemType, string> = {
+      image: "사진",
+      video: "동영상",
+      document: "문서",
+      file: "파일"
+    };
+    return labels[type] || type;
   };
 
   // 기본 감정 데이터 제거 (더 이상 사용하지 않음)
@@ -440,13 +560,62 @@ export const JournalBook = () => {
           </div>
         </div>
 
-        <div className="mt-6 flex justify-end">
-          {entries.length > 0 && (
-            <Button onClick={handleOpenAnalysis} className="gap-2 shadow-md hover:shadow-lg transition-all">
-              <Sparkles className="w-4 h-4" />
-              요약하기
+        <div className="mt-6 flex justify-between items-center">
+          <div className="relative" ref={uploadMenuRef}>
+            <Button 
+              size="sm"
+              onClick={() => setIsUploadMenuOpen(!isUploadMenuOpen)}
+              className="gap-2 bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
+              aria-label="파일 업로드"
+            >
+              <Paperclip className="w-4 h-4" />
             </Button>
-          )}
+            
+            {isUploadMenuOpen && (
+              <div
+                role="menu"
+                className="absolute left-0 bottom-full mb-2 w-36 rounded-md border border-ink/10 bg-background/95 shadow-page backdrop-blur-sm z-20"
+              >
+                <button
+                  type="button"
+                  className="w-full text-left px-3 py-2 text-sm font-serif text-sepia hover:bg-gold/10 hover:text-gold transition-colors"
+                  onClick={() => handleUploadClick("image")}
+                >
+                  사진
+                </button>
+                <button
+                  type="button"
+                  className="w-full text-left px-3 py-2 text-sm font-serif text-sepia hover:bg-gold/10 hover:text-gold transition-colors"
+                  onClick={() => handleUploadClick("video")}
+                >
+                  동영상
+                </button>
+                <button
+                  type="button"
+                  className="w-full text-left px-3 py-2 text-sm font-serif text-sepia hover:bg-gold/10 hover:text-gold transition-colors"
+                  onClick={() => handleUploadClick("document")}
+                >
+                  문서
+                </button>
+                <button
+                  type="button"
+                  className="w-full text-left px-3 py-2 text-sm font-serif text-sepia hover:bg-gold/10 hover:text-gold transition-colors"
+                  onClick={() => handleUploadClick("file")}
+                >
+                  파일
+                </button>
+              </div>
+            )}
+          </div>
+
+          <Button 
+            onClick={handleOpenAnalysis} 
+            className="gap-2 shadow-md hover:shadow-lg transition-all"
+            disabled={entries.length === 0}
+          >
+            <Sparkles className="w-4 h-4" />
+            요약하기
+          </Button>
         </div>
       </div>
 
@@ -584,6 +753,20 @@ export const JournalBook = () => {
         </DialogContent>
       </Dialog>
 
+      {/* 파일 업로드 모달 */}
+      {selectedUploadType && (
+        <AddItemModal
+          isOpen={isUploadModalOpen}
+          onClose={() => {
+            setIsUploadModalOpen(false);
+            setSelectedUploadType(null);
+          }}
+          itemType={selectedUploadType}
+          typeLabel={getTypeLabel(selectedUploadType)}
+          onAdd={handleAddItem}
+        />
+      )}
+
       {/* 기존 요약 팝업 (Dialog) */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent 
@@ -663,11 +846,47 @@ export const JournalBook = () => {
                     >
                       {summaryResult?.summary || "요약을 불러오는 중입니다..."}
                     </div>
+                    
+                    {/* 선택된 사진 미리보기 */}
+                    {selectedImage && (
+                      <div className="mt-6 space-y-2">
+                        <p className="text-sm font-serif text-stone-600">첨부된 사진</p>
+                        <div className="relative group inline-block">
+                          <img 
+                            src={URL.createObjectURL(selectedImage)} 
+                            alt="선택된 사진"
+                            className="w-32 h-32 object-cover rounded border border-stone-300"
+                          />
+                          <button
+                            onClick={handleRemoveImage}
+                            className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   <div className="shrink-0 pt-4 mt-2 border-t border-stone-300/50 flex items-center justify-between text-stone-500 text-sm font-serif">
                     <span>총 {summaryResult?.message_count || entries.length}개의 기록</span>
                     <div className="flex gap-2">
+                      <input
+                        ref={imageInputRef}
+                        type="file"
+                        accept="image/*"
+                        onChange={handleImageSelect}
+                        className="hidden"
+                      />
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        onClick={() => imageInputRef.current?.click()}
+                        className="hover:bg-stone-200/50 hover:text-stone-800"
+                      >
+                        <Image className="w-4 h-4 mr-1" />
+                        사진추가
+                      </Button>
                       <Button variant="ghost" size="sm" onClick={() => setIsDialogOpen(false)} className="hover:bg-stone-200/50 hover:text-stone-800">
                         덮기
                       </Button>

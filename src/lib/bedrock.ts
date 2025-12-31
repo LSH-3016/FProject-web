@@ -10,13 +10,16 @@ export interface SummaryResult {
   message_count?: number;
 }
 
-export async function summarizeJournalEntries(userId: string, apiBaseUrl: string): Promise<SummaryResult> {
+export async function summarizeJournalEntries(userId: string, apiBaseUrl: string, date?: string): Promise<SummaryResult> {
   try {
     console.log('API 요약 시작 - 사용자:', userId);
     
-    // FastAPI 백엔드의 요약 엔드포인트 호출
-    console.log('백엔드 요약 API 호출 중...');
-    const response = await fetch(`${apiBaseUrl}/summary/${userId}`, {
+    // 날짜가 제공되지 않으면 오늘 날짜 사용
+    const targetDate = date || new Date().toISOString().split('T')[0];
+    
+    // FastAPI 백엔드의 요약 엔드포인트 호출 (날짜 파라미터 추가)
+    console.log('백엔드 요약 API 호출 중... 날짜:', targetDate);
+    const response = await fetch(`${apiBaseUrl}/summary/${userId}?date=${targetDate}`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
