@@ -36,6 +36,9 @@ export const JournalBook = () => {
 
   // 히스토리 저장 완료 알림 상태
   const [isSuccessDialogOpen, setIsSuccessDialogOpen] = useState(false);
+  
+  // 히스토리 저장 중 로딩 상태
+  const [isSavingHistory, setIsSavingHistory] = useState(false);
 
   // 에러 다이얼로그 상태
   const [isErrorDialogOpen, setIsErrorDialogOpen] = useState(false);
@@ -54,7 +57,7 @@ export const JournalBook = () => {
   // API 관련 상태
   const [isLoadingEntries, setIsLoadingEntries] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const currentUserId = "test_user"; // 실제로는 인증된 사용자 ID를 사용
+  const currentUserId = "user_001"; // 실제로는 인증된 사용자 ID를 사용
   const API_BASE_URL = import.meta.env.VITE_JOURNAL_API_URL || "http://localhost:8000";
   const LIBRARY_API_URL = import.meta.env.VITE_LIBRARY_API_URL || "http://192.168.0.138:8000/api/v1";
 
@@ -301,14 +304,13 @@ export const JournalBook = () => {
       // 이미 오늘 날짜의 히스토리가 존재하는 경우
       if (checkData.exists) {
         setExistingHistoryDate(checkData.record_date);
-        // 기존 히스토리 ID 저장 (API 응답에 id가 있다고 가정)
         setExistingHistoryId(checkData.id || null);
         setIsOverwriteDialogOpen(true);
         return;
       }
       
-      // 존재하지 않으면 바로 저장
-      await performSaveToHistory(false);
+      // 존재하지 않으면 바로 저장 (s3_key는 null)
+      await performSaveToHistory(false, null);
       
     } catch (error) {
       console.error("히스토리 확인 실패:", error);
@@ -317,14 +319,94 @@ export const JournalBook = () => {
     }
   };
 
-  const performSaveToHistory = async (isOverwrite: boolean = false) => {
+  const performSaveToHistory = async (isOverwrite: boolean = false, existingS3KeyParam: string | null = null) => {
     if (!summaryResult) return;
     
+    setIsSavingHistory(true); // 로딩 시작
+    
     try {
-      // 1. 선택된 사진이 있으면 먼저 업로드하고 S3 Key 받기
-      let s3Key: string | null = null;
+      // 1. 기존 s3_key 확인 (덮어쓰기일 때만)
+      let existingS3Key: string | null = existingS3KeyParam;
       
-      if (selectedImage) {
+      console.log('=== performSaveToHistory 시작 ===');
+      console.log('isOverwrite:', isOverwrite);
+      console.log('existingHistoryId:', existingHistoryId);
+      console.log('existingS3KeyParam:', existingS3KeyParam);
+      
+      // 신규 등록이면 s3_key 확인 건너뛰기
+      if (!isOverwrite) {
+        console.log('신규 등록 - s3_key 확인 건너뜀');
+        existingS3Key = null;
+      }
+      // 덮어쓰기이고 existingHistoryId가 있으면 ID로 확인
+      else if (isOverwrite && existingHistoryId && existingS3Key === null) {
+        console.log('기존 히스토리의 s3_key 확인 중 (ID 사용)...');
+        try {
+          const checkUrl = `${API_BASE_URL}/history/${existingHistoryId}/check-s3`;
+          console.log('check-s3 API 호출:', checkUrl);
+          
+          const checkResponse = await fetch(checkUrl);
+          console.log('check-s3 응답 상태:', checkResponse.status);
+          
+          if (checkResponse.ok) {
+            const checkData = await checkResponse.json();
+            console.log('check-s3 응답 데이터:', checkData);
+            existingS3Key = checkData.s3_key;
+            console.log('기존 히스토리 s3_key:', existingS3Key ? existingS3Key : 'null');
+          } else {
+            console.error('check-s3 API 호출 실패:', checkResponse.status);
+          }
+        } catch (error) {
+          console.error('s3_key 확인 중 오류:', error);
+        }
+      }
+      // 덮어쓰기인데 existingHistoryId가 없으면 user_id와 날짜로 확인
+      else if (isOverwrite && !existingHistoryId && existingS3Key === null) {
+        console.log('user_id와 날짜로 s3_key 확인 중...');
+        try {
+          const today = new Date();
+          const recordDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+          const checkUrl = `${API_BASE_URL}/history/check-s3-by-date?user_id=${currentUserId}&record_date=${recordDate}`;
+          console.log('check-s3-by-date API 호출:', checkUrl);
+          
+          const checkResponse = await fetch(checkUrl);
+          console.log('check-s3-by-date 응답 상태:', checkResponse.status);
+          
+          if (checkResponse.ok) {
+            const checkData = await checkResponse.json();
+            console.log('check-s3-by-date 응답 데이터:', checkData);
+            
+            if (checkData.found) {
+              existingS3Key = checkData.s3_key;
+              console.log('날짜로 찾은 히스토리 s3_key:', existingS3Key ? existingS3Key : 'null');
+              
+              // 필요하면 existingHistoryId도 저장
+              if (checkData.history_id) {
+                setExistingHistoryId(checkData.history_id);
+                console.log('existingHistoryId 설정:', checkData.history_id);
+              }
+            } else {
+              console.log('해당 날짜의 히스토리를 찾을 수 없음');
+            }
+          } else {
+            console.error('check-s3-by-date API 호출 실패:', checkResponse.status);
+          }
+        } catch (error) {
+          console.error('날짜로 s3_key 확인 중 오류:', error);
+        }
+      }
+      
+      console.log('최종 existingS3Key:', existingS3Key);
+      console.log('existingS3Key 타입:', typeof existingS3Key);
+      console.log('existingS3Key === null:', existingS3Key === null);
+      console.log('existingS3Key === "":', existingS3Key === '');
+      console.log('selectedImage:', selectedImage ? selectedImage.name : 'null');
+      console.log('업로드 조건 체크: selectedImage && existingS3Key === null =', selectedImage && existingS3Key === null);
+      
+      // 2. 선택된 사진이 있고, 기존 s3_key가 null 또는 undefined인 경우에만 업로드
+      let s3Key: string | null = existingS3Key; // 기존 s3_key 유지
+      
+      if (selectedImage && (existingS3Key === null || existingS3Key === undefined)) {
         console.log('사진 업로드 시작:', selectedImage.name);
         
         try {
@@ -355,9 +437,11 @@ export const JournalBook = () => {
         } catch (uploadError) {
           console.error('사진 업로드 중 오류:', uploadError);
         }
+      } else if (selectedImage && existingS3Key !== null && existingS3Key !== undefined) {
+        console.log('기존 s3_key가 존재하여 사진 업로드를 건너뜁니다. s3_key:', existingS3Key, '(타입:', typeof existingS3Key, ')');
       }
       
-      // 2. 백엔드 API에서 상세 기록 가져오기
+      // 3. 백엔드 API에서 상세 기록 가져오기
       const response = await fetch(`${API_BASE_URL}/messages/content?user_id=${currentUserId}&limit=100&offset=0`);
       
       if (!response.ok) {
@@ -410,12 +494,14 @@ export const JournalBook = () => {
       setSelectedImage(null);
       
       // 성공 다이얼로그 표시
+      setIsSavingHistory(false); // 로딩 종료
       setIsDialogOpen(false);
       setIsOverwriteDialogOpen(false);
       setIsSuccessDialogOpen(true);
       
     } catch (error) {
       console.error("히스토리 저장 실패:", error);
+      setIsSavingHistory(false); // 로딩 종료
       setErrorMessage("히스토리 저장에 실패했습니다. 다시 시도해주세요.");
       setIsErrorDialogOpen(true);
     }
@@ -676,12 +762,60 @@ export const JournalBook = () => {
             </Button>
             <Button 
               variant="default" 
-              onClick={() => performSaveToHistory(true)}
+              onClick={async () => {
+                console.log('덮어쓰기 버튼 클릭 - existingHistoryId:', existingHistoryId);
+                
+                // existingHistoryId가 있으면 s3_key 확인
+                let existingS3Key: string | null = null;
+                if (existingHistoryId) {
+                  try {
+                    const checkUrl = `${API_BASE_URL}/history/${existingHistoryId}/check-s3`;
+                    console.log('check-s3 API 호출:', checkUrl);
+                    
+                    const checkResponse = await fetch(checkUrl);
+                    if (checkResponse.ok) {
+                      const checkData = await checkResponse.json();
+                      existingS3Key = checkData.s3_key;
+                      console.log('덮어쓰기 전 s3_key 확인:', existingS3Key);
+                    }
+                  } catch (error) {
+                    console.error('s3_key 확인 실패:', error);
+                  }
+                }
+                
+                await performSaveToHistory(true, existingS3Key);
+              }}
               className="bg-amber-600 hover:bg-amber-700 text-white"
             >
               네, 덮어쓸래요
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 히스토리 저장 중 로딩 팝업 */}
+      <Dialog open={isSavingHistory} onOpenChange={() => {}}>
+        <DialogContent className="sm:max-w-md bg-card/95 backdrop-blur-md border border-primary/10 shadow-xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-primary">
+              <Loader2 className="w-5 h-5 animate-spin" />
+              히스토리 등록 중
+            </DialogTitle>
+            <DialogDescription className="pt-4 pb-2">
+              <div className="flex flex-col items-center gap-3">
+                <div className="relative">
+                  <Loader2 className="w-12 h-12 text-primary animate-spin" />
+                  <Sparkles className="w-4 h-4 text-primary absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 opacity-50 animate-pulse" />
+                </div>
+                <p className="text-center text-base text-foreground font-medium">
+                  히스토리에 등록하고 있습니다...
+                </p>
+                <p className="text-center text-sm text-muted-foreground">
+                  잠시만 기다려주세요.
+                </p>
+              </div>
+            </DialogDescription>
+          </DialogHeader>
         </DialogContent>
       </Dialog>
 

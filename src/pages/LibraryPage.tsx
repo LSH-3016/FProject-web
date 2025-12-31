@@ -39,7 +39,7 @@ const LibraryPage = () => {
   });
   const uploadMenuRef = useRef<HTMLDivElement | null>(null);
   const navigate = useNavigate();
-  const { getLatestItemByType, getItemCountByType, getItemsByType, addItem } = useLibraryContext();
+  const { getLatestItemByType, getItemCountByType, getItemsByType, addItem, items } = useLibraryContext();
 
   const formatDate = (value?: string | Date) => {
     if (!value) {
@@ -65,6 +65,19 @@ const LibraryPage = () => {
       })),
     [getLatestItemByType, getItemCountByType]
   );
+
+  // CircularGallery용 이미지 데이터 준비
+  const galleryItems = useMemo(() => {
+    const imageItems = items
+      .filter(item => item.type === 'image' && item.thumbnail)
+      .slice(0, 30) // 최신 30개만 사용
+      .map(item => ({
+        image: item.thumbnail!,
+        text: item.name
+      }));
+    
+    return imageItems.length > 0 ? imageItems : undefined;
+  }, [items]);
 
   useEffect(() => {
     // 드롭다운이 열려 있을 때 바깥 클릭으로 닫기
@@ -154,7 +167,13 @@ const LibraryPage = () => {
           </header>
 
           <div className="w-full h-[450px] my-8 relative rounded-2xl bg-black/5 overflow-hidden border border-[#D9C5B2]/20 shadow-inner">
-            <CircularGallery key="main-gallery" bend={3} textColor="#8C7365" borderRadius={0.05} />
+            <CircularGallery 
+              key="main-gallery" 
+              items={galleryItems}
+              bend={3} 
+              textColor="#8C7365" 
+              borderRadius={0.05} 
+            />
           </div>
 
           {/* Upload dropdown */}
