@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { summarizeJournalEntries, type SummaryResult } from "@/lib/bedrock";
 import { JournalApiService } from "../services/journalApi";
+import { apiService } from "@/services/api";
 
 export const useJournalSummary = (userId: string, apiBaseUrl: string, libraryApiUrl: string) => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -19,6 +20,7 @@ export const useJournalSummary = (userId: string, apiBaseUrl: string, libraryApi
   // 이미지 관련 상태
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [existingS3Key, setExistingS3Key] = useState<string | null>(null);
+  const [existingImageUrl, setExistingImageUrl] = useState<string | null>(null);
   const [isCheckingS3Key, setIsCheckingS3Key] = useState(false);
 
   const apiService = new JournalApiService(apiBaseUrl);
@@ -30,6 +32,7 @@ export const useJournalSummary = (userId: string, apiBaseUrl: string, libraryApi
     setLoadingMessage("AI가 기록을 분석하고 있어요...");
     setSelectedImage(null);
     setExistingS3Key(null);
+    setExistingImageUrl(null);
     
     // 요약 시작 시 기존 s3_key 확인
     setIsCheckingS3Key(true);
@@ -42,16 +45,26 @@ export const useJournalSummary = (userId: string, apiBaseUrl: string, libraryApi
         try {
           const s3Data = await apiService.checkS3Key(checkData.id);
           setExistingS3Key(s3Data.s3_key);
+          
+          // s3_key가 있으면 이미지 URL 가져오기
+          if (s3Data.s3_key) {
+            const imageUrl = await apiService.getFileUrlFromS3Key(s3Data.s3_key);
+            setExistingImageUrl(imageUrl);
+            console.log('기존 이미지 URL:', imageUrl);
+          }
         } catch (error) {
           console.error('s3_key 확인 실패:', error);
           setExistingS3Key(null);
+          setExistingImageUrl(null);
         }
       } else {
         setExistingS3Key(null);
+        setExistingImageUrl(null);
       }
     } catch (error) {
       console.error('히스토리 확인 실패:', error);
       setExistingS3Key(null);
+      setExistingImageUrl(null);
     } finally {
       setIsCheckingS3Key(false);
     }
@@ -168,7 +181,8 @@ export const useJournalSummary = (userId: string, apiBaseUrl: string, libraryApi
       // 사진 업로드 로직
       let s3Key: string | null = existingS3Key;
       
-      if (selectedImage && (existingS3Key === null || existingS3Key === undefined)) {
+      // 새로운 사진이 선택되었으면 업로드 (기존 사진이 있어도 덮어쓰기)
+      if (selectedImage) {
         console.log('사진 업로드 시작:', selectedImage.name);
         
         try {
@@ -259,6 +273,7 @@ export const useJournalSummary = (userId: string, apiBaseUrl: string, libraryApi
     isSavingHistory,
     selectedImage,
     existingS3Key,
+    existingImageUrl,
     isCheckingS3Key,
     
     // 함수

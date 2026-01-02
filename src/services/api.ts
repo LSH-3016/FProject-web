@@ -48,6 +48,10 @@ interface CreateItemRequest {
   preview_text?: string;
 }
 
+// S3 설정 - 환경변수에서 가져오기
+const S3_BUCKET_NAME = import.meta.env.VITE_S3_BUCKET_NAME || "library-test-youk";
+const S3_REGION = import.meta.env.VITE_S3_REGION || "ap-northeast-2";
+
 class ApiService {
   private getAuthHeaders(): HeadersInit {
     const token = localStorage.getItem("auth_token");
@@ -55,6 +59,26 @@ class ApiService {
       "Content-Type": "application/json",
       ...(token && { Authorization: `Bearer ${token}` }),
     };
+  }
+
+  // S3 키로 파일 URL 가져오기 (백엔드 API 사용)
+  async getFileUrlFromS3Key(s3Key: string): Promise<string | null> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/library-items/url-by-key?s3_key=${encodeURIComponent(s3Key)}`, {
+        headers: this.getAuthHeaders(),
+      });
+
+      if (!response.ok) {
+        console.error(`S3 URL 조회 실패: ${response.status}`);
+        return null;
+      }
+
+      const result = await response.json();
+      return result.data?.file_url || result.file_url || null;
+    } catch (error) {
+      console.error('S3 URL 조회 중 오류:', error);
+      return null;
+    }
   }
 
   // Presigned URL 요청

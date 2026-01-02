@@ -1,165 +1,486 @@
-import { useState } from "react";
+import React, { useState, useEffect, useMemo } from 'react';
 import { MainLayout } from "@/components/layout/MainLayout";
-import { BookOpen, ChevronRight, Calendar } from "lucide-react";
-import { cn } from "@/lib/utils";
-
-interface HistoryChapter {
-  id: string;
-  date: string;
-  title: string;
-  preview: string;
-  entries: number;
-}
-
-const mockHistory: HistoryChapter[] = [
-  {
-    id: "1",
-    date: "2024년 12월 22일",
-    title: "겨울의 시작",
-    preview: "오늘은 첫눈이 내렸다. 창밖을 바라보며 지난 시간들을 떠올렸다...",
-    entries: 5,
-  },
-  {
-    id: "2",
-    date: "2024년 12월 21일",
-    title: "조용한 하루",
-    preview: "아무것도 하지 않은 하루였지만, 그래서 더 평화로웠다...",
-    entries: 3,
-  },
-  {
-    id: "3",
-    date: "2024년 12월 20일",
-    title: "새로운 시작",
-    preview: "과거의 나를 기록하기 시작한 첫 날. 이 기록이 미래의 나에게...",
-    entries: 7,
-  },
-];
+import { Grimoire } from '@/components/history/Grimoire';
+import { historyDB, clearLocalDB } from '@/services/historyDB';
+import { HistoryEventUI, AppState, KOREAN_UI_TEXTS } from '@/types/history';
+import { Search, Sparkles, Trash2, Tag, X } from 'lucide-react';
+import ErrorBoundary from '@/components/history/ErrorBoundary';
 
 const History = () => {
-  const [selectedChapter, setSelectedChapter] = useState<string | null>(null);
+  const [query, setQuery] = useState('');
+  const [historyContent, setHistoryContent] = useState<HistoryEventUI[]>([]);
+  const [filteredContent, setFilteredContent] = useState<HistoryEventUI[]>([]);
+  const [appState, setAppState] = useState<AppState>(AppState.IDLE);
+  const [flipTrigger, setFlipTrigger] = useState<number>(0);
+  const [errorMessage, setErrorMessage] = useState<string>('');
+  const [availableTags, setAvailableTags] = useState<string[]>([]);
+  const [selectedTag, setSelectedTag] = useState<string>('');
+  const [duplicateWarning, setDuplicateWarning] = useState<string>('');
+  const [searchResults, setSearchResults] = useState<HistoryEventUI[]>([]);
+  const [showSidebar, setShowSidebar] = useState(false);
+  const [recentViewed, setRecentViewed] = useState<string[]>([]); // 최근 본 기록 (날짜 형식)
+
+  // 컴포넌트 마운트 시 로컬 DB 정리 및 PostgreSQL에서 기록 로드
+  useEffect(() => {
+    const initializeApp = async () => {
+      // 사용자 ID 설정 (Journal과 동일하게)
+      const userId = 'user_001'; // 실제로는 인증된 사용자 ID 사용
+      localStorage.setItem('currentUserId', userId);
+
+      // 로컬 IndexedDB 정리 (한 번만 실행)
+      const hasCleanedLocal = localStorage.getItem('hasCleanedLocalDB');
+      if (!hasCleanedLocal) {
+        await clearLocalDB();
+        localStorage.setItem('hasCleanedLocalDB', 'true');
+      }
+
+      // 최근 본 기록 불러오기
+      const savedRecent = localStorage.getItem('recentViewed');
+      if (savedRecent) {
+        setRecentViewed(JSON.parse(savedRecent));
+      }
+
+      // PostgreSQL에서 데이터 로드
+      await loadHistory();
+    };
+
+    initializeApp();
+  }, []);
+
+  // 태그 필터링 - DB API 사용
+  useEffect(() => {
+    const filterByTag = async () => {
+      if (selectedTag) {
+        const filtered = await historyDB.filterByTag(selectedTag);
+        setFilteredContent(filtered);
+      } else {
+        const allRecords = await historyDB.getAll();
+        setFilteredContent(allRecords);
+      }
+    };
+
+    if (historyContent.length > 0) {
+      filterByTag();
+    }
+  }, [selectedTag, historyContent.length]);
+
+  const loadHistory = async () => {
+    console.log('📖 loadHistory 시작...');
+    const history = await historyDB.getAll();
+    const tags = await historyDB.getAllTags();
+
+    console.log('📚 불러온 기록:', history.length, '개');
+    console.log('🏷️ 불러온 태그:', tags);
+
+    if (history.length > 0) {
+      setHistoryContent(history);
+      setFilteredContent(history);
+      setAppState(AppState.READING);
+      console.log('✅ 상태 업데이트 완료');
+    } else {
+      console.log('⚠️ 기록이 없습니다');
+    }
+    setAvailableTags(tags);
+  };
+
+  const handleSearch = async (e?: React.FormEvent | string) => {
+    if (typeof e !== 'string' && e) e.preventDefault();
+
+    const topic = typeof e === 'string' ? e : query;
+    if (!topic.trim()) return;
+
+    setAppState(AppState.LOADING);
+    setErrorMessage('');
+    setDuplicateWarning('');
+
+    try {
+      // 태그 중복 체크 (검색어가 태그로 이미 존재하는지)
+      const isDuplicate = await historyDB.hasTag(topic.trim());
+
+      // DB에서 검색 (키워드 검색 - 콘텐츠 내용 검색)
+      const dbResults = await historyDB.search(topic.trim());
+
+      if (dbResults.length > 0) {
+        // 중복 제거: id와 content 기준으로 유니크한 결과만 필터링
+        const uniqueResults = dbResults.filter((item, index, self) =>
+          index === self.findIndex((t) => (
+            t.id === item.id ||
+            (t.parsed.title === item.parsed.title && t.parsed.year === item.parsed.year)
+          ))
+        );
+
+        console.log(`🔍 검색 결과: ${dbResults.length}개 → 중복 제거 후 ${uniqueResults.length}개`);
+
+        // DB에 관련 내용이 있으면 표시
+        setSearchResults(uniqueResults);
+        setShowSidebar(true);
+        setAppState(AppState.IDLE);
+
+        // 태그로도 존재하면 중복 경고
+        if (isDuplicate) {
+          setDuplicateWarning(topic.trim());
+        }
+        return;
+      }
+
+      // DB에 검색 결과가 없으면 에러 표시
+      throw new Error(`"${topic}"에 대한 검색 결과가 없습니다. DB에 데이터를 먼저 추가해주세요.`);
+
+    } catch (error) {
+      console.error("Search failed:", error);
+      setErrorMessage(error instanceof Error ? error.message : "기록을 불러올 수 없습니다...");
+      setAppState(AppState.ERROR);
+      setShowSidebar(false);
+    }
+  };
+
+  const handleSelectResult = async (selectedEvents: HistoryEventUI[]) => {
+    try {
+      // DB에 저장하지 않고 바로 표시 (임시 사용)
+      setHistoryContent(selectedEvents);
+      setFilteredContent(selectedEvents);
+      setAppState(AppState.READING);
+      setQuery('');
+      setShowSidebar(false);
+      setSearchResults([]);
+      setDuplicateWarning('');
+      setFlipTrigger((prev: number) => prev + 1);
+
+      // 최근 본 기록에 추가 (날짜 기준, 중복 제거, 최대 5개)
+      const newDates = selectedEvents.map(e => e.record_date);
+      const updatedRecent = [...new Set([...newDates, ...recentViewed])].slice(0, 5);
+      setRecentViewed(updatedRecent);
+      localStorage.setItem('recentViewed', JSON.stringify(updatedRecent));
+
+    } catch (error) {
+      console.error("Display failed:", error);
+      setErrorMessage(error instanceof Error ? error.message : "표시에 실패했습니다.");
+    }
+  };
+
+  const clearHistory = async () => {
+    if (window.confirm(KOREAN_UI_TEXTS.confirmReset)) {
+      await historyDB.clear();
+      setHistoryContent([]);
+      setFilteredContent([]);
+      setAvailableTags([]);
+      setSelectedTag('');
+      setAppState(AppState.IDLE);
+      setFlipTrigger(0);
+    }
+  };
+
+  const handleTagSelect = (tag: string) => {
+    setSelectedTag(tag === selectedTag ? '' : tag);
+  };
+
+  // 배경 스타일을 useMemo로 메모이제이션 (리렌더 시 재생성 방지)
+  const backgroundStyle = useMemo(() => ({
+    backgroundImage: 'url(/library-bg.png)',
+    backgroundSize: 'cover' as const,
+    backgroundPosition: 'center' as const,
+    backgroundRepeat: 'no-repeat' as const,
+    backgroundAttachment: 'fixed' as const
+  }), []);
 
   return (
     <MainLayout>
-      <div className="min-h-screen py-12 px-4">
-        <div className="max-w-4xl mx-auto">
-          {/* Header */}
-          <header className="text-center mb-12 animate-fade-in">
-            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-secondary mb-4">
-              <Calendar className="w-8 h-8 text-gold" />
-            </div>
-            <h1 className="font-serif text-3xl text-primary mb-2 gold-accent">
-              히스토리
-            </h1>
-            <p className="font-handwriting text-xl text-muted-foreground">
-              지난 기록들을 다시 펼쳐보세요
-            </p>
-          </header>
+      <div className="h-screen bg-background relative overflow-hidden w-full">
+        {/* 고정 배경 레이어 */}
+        <div className="fixed inset-0 pointer-events-none" style={backgroundStyle}>
+          {/* 다크 오버레이 */}
+          <div className="absolute inset-0 bg-black/50"></div>
+        </div>
 
-          {/* Chapter List */}
-          <div className="space-y-4">
-            {mockHistory.map((chapter, index) => (
+        {/* 콘텐츠 레이어 */}
+        <div className="relative z-10 h-screen flex overflow-hidden">
+
+      {showSidebar && (
+        <div className="fixed left-0 top-0 h-screen w-80 bg-[#1a120b]/95 backdrop-blur-sm border-r border-amber-900/30 z-30 overflow-y-auto shadow-2xl">       
+          <div className="p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-amber-100 font-serif text-xl flex items-center gap-2">
+                <Search className="w-5 h-5" />
+                검색 결과
+              </h2>
               <button
-                key={chapter.id}
-                onClick={() => setSelectedChapter(
-                  selectedChapter === chapter.id ? null : chapter.id
-                )}
-                className={cn(
-                  "w-full text-left paper-texture rounded-lg overflow-hidden transition-all duration-500 animate-fade-in",
-                  selectedChapter === chapter.id
-                    ? "shadow-book"
-                    : "shadow-page hover:shadow-soft"
-                )}
-                style={{ animationDelay: `${index * 100}ms` }}
+                onClick={() => {
+                  setShowSidebar(false);
+                  setDuplicateWarning('');
+                }}
+                className="text-amber-700 hover:text-amber-500 transition-colors"
               >
-                {/* Book spine accent */}
-                <div className="absolute left-0 top-0 bottom-0 w-2 bg-gradient-to-r from-leather to-transparent" />
+                <X className="w-5 h-5" />
+              </button>
+            </div>
 
-                <div className="p-6 pl-8">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      {/* Date as chapter number */}
-                      <div className="flex items-center gap-2 mb-2">
-                        <span className="font-serif text-sm text-ink/60">
-                          {chapter.date}
-                        </span>
-                        <span className="text-ink/40">·</span>
-                        <span className="font-serif text-sm text-ink/60">
-                          {chapter.entries}개의 기록
-                        </span>
-                      </div>
+            <div className="mb-4 text-amber-800/80 text-sm font-serif">
+              "{query}" 검색 결과 {searchResults.length}개
+            </div>
 
-                      {/* Chapter title */}
-                      <h3 className="font-serif text-xl text-ink mb-3">
-                        {chapter.title}
-                      </h3>
-
-                      {/* Preview */}
-                      <p className="font-handwriting text-ink/80 text-lg line-clamp-2 leading-relaxed">
-                        {chapter.preview}
-                      </p>
-                    </div>
-
-                    {/* Open indicator */}
-                    <div className="ml-4 flex-shrink-0">
-                      <div
-                        className={cn(
-                          "w-10 h-10 rounded-full bg-secondary/50 flex items-center justify-center transition-transform duration-300",
-                          selectedChapter === chapter.id && "rotate-90"
-                        )}
-                      >
-                        <ChevronRight className="w-5 h-5 text-gold" />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Expanded content */}
-                  <div
-                    className={cn(
-                      "overflow-hidden transition-all duration-500",
-                      selectedChapter === chapter.id
-                        ? "max-h-96 opacity-100 mt-6"
-                        : "max-h-0 opacity-0"
-                    )}
-                  >
-                    <div className="border-t border-ink/10 pt-6 page-lines">
-                      <div className="flex items-center gap-2 mb-4">
-                        <BookOpen className="w-5 h-5 text-gold" />
-                        <span className="font-serif text-sm text-ink/70">
-                          전체 기록
-                        </span>
-                      </div>
-
-                      <div className="space-y-5 font-handwriting text-ink/85 text-lg leading-relaxed tracking-wide">
-                        <p>
-                          이 날의 첫 번째 기록입니다. 아침에 일어나 창밖을 바라보았습니다.
-                        </p>
-                        <p>
-                          점심 무렵, 오래된 사진첩을 꺼내 보았습니다. 추억이 새록새록 떠올랐습니다.
-                        </p>
-                        <p>
-                          저녁에는 조용히 차를 마시며 하루를 정리했습니다.
-                        </p>
-                      </div>
+            {/* 중복 경고 메시지 (사이드바 내부) */}
+            {duplicateWarning && (
+              <div className="mb-4 bg-amber-900/20 border border-amber-700/50 text-amber-200 px-3 py-2 rounded text-xs font-serif">
+                <div className="flex items-start gap-2">
+                  <span className="text-amber-500">⚠</span>
+                  <div>
+                    <div className="font-bold mb-1">이미 추가된 검색어입니다</div>
+                    <div className="text-amber-300/80">
+                      "{duplicateWarning}"는 이미 책에 추가되어 있습니다.
+                      그래도 추가하시려면 아래 버튼을 클릭하세요.
                     </div>
                   </div>
                 </div>
-              </button>
-            ))}
-          </div>
+              </div>
+            )}
 
-          {/* Empty state hint */}
-          {mockHistory.length === 0 && (
-            <div className="text-center py-20">
-              <BookOpen className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
-              <p className="font-handwriting text-xl text-muted-foreground">
-                아직 기록이 없습니다
-              </p>
-              <p className="font-serif text-sm text-muted-foreground mt-2">
-                첫 번째 기록을 시작해보세요
-              </p>
+            <div className="space-y-3">
+              {searchResults.map((result, index) => (
+                <div
+                  key={index}
+                  className="bg-amber-900/10 border border-amber-900/30 rounded-lg p-4 hover:bg-amber-900/20 transition-all cursor-pointer group"
+                  onClick={() => handleSelectResult([result])}
+                >
+                  <div className="flex items-start justify-between mb-2">
+                    <h3 className="text-amber-100 font-serif font-bold text-base group-hover:text-amber-50">
+                      {result.parsed.title}
+                    </h3>
+                    <span className="text-amber-700 text-xs font-serif whitespace-nowrap ml-2">
+                      {result.parsed.year}
+                    </span>
+                  </div>
+                  <p className="text-amber-800/90 text-sm font-serif leading-relaxed">
+                    {result.parsed.description}
+                  </p>
+                  <div className="mt-3 text-amber-700/60 text-xs font-serif group-hover:text-amber-600">
+                    클릭하여 추가 →
+                  </div>
+                </div>
+              ))}
             </div>
-          )}
+
+            <button
+              onClick={() => handleSelectResult(searchResults)}
+              className="w-full mt-6 bg-amber-700 hover:bg-amber-600 text-amber-100 py-3 rounded-lg font-serif transition-colors shadow-lg"
+            >
+              전체 추가 ({searchResults.length}개)
+            </button>
+          </div>
         </div>
+      )}
+
+      {/* 메인 콘텐츠 영역 */}
+      <div className="flex-1 flex flex-col items-center overflow-hidden">
+
+      {/* 상단 검색바 영역 */}
+      <div className="z-20 w-full max-w-2xl px-4 py-2 mt-1 flex flex-col items-center gap-2 flex-shrink-0">
+        {/* 중복 경고 메시지 (사이드바가 닫혔을 때만) */}
+        {duplicateWarning && !showSidebar && (
+          <div className="w-full bg-amber-900/20 border border-amber-700/50 text-amber-200 px-4 py-2 rounded-lg text-sm font-serif flex items-center justify-between animate-pulse">
+            <span>"{duplicateWarning}" {KOREAN_UI_TEXTS.duplicateWarning}</span>
+            <button onClick={() => setDuplicateWarning('')} className="hover:text-amber-100">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+
+        <form
+          onSubmit={handleSearch}
+          className="relative w-full group transition-all duration-300 focus-within:scale-105"
+        >
+          <div className="relative">
+            <input
+              type="text"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder={KOREAN_UI_TEXTS.searchPlaceholder}
+              disabled={appState === AppState.LOADING}
+              className="w-full px-6 py-4 pr-14 text-lg rounded-full border-4 border-amber-700 bg-amber-50/95 text-amber-900 placeholder-amber-700 focus:outline-none focus:ring-4 focus:ring-amber-500 disabled:opacity-50 shadow-2xl backdrop-blur-sm font-serif"
+            />
+
+            <button
+              type="submit"
+              disabled={appState === AppState.LOADING || !query.trim()}
+              className="absolute right-2 top-1/2 -translate-y-1/2 p-3 bg-amber-700 text-white rounded-full hover:bg-amber-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-md"
+            >
+              {appState === AppState.LOADING ? (
+                <Sparkles className="w-5 h-5 animate-spin" />
+              ) : (
+                <Search className="w-5 h-5" />
+              )}
+            </button>
+          </div>
+        </form>
+
+        {/* 최근 본 기록 (날짜 태그) */}
+        {recentViewed && recentViewed.length > 0 && (
+          <div className="w-full px-2">
+            <div className="relative bg-amber-50/90 backdrop-blur-sm border-2 border-amber-900/40 rounded-lg p-2 shadow-lg">
+              {/* 모서리 장식 */}
+              <div className="absolute top-0 left-0 w-2 h-2 border-t-2 border-l-2 border-amber-900/50"></div>
+              <div className="absolute top-0 right-0 w-2 h-2 border-t-2 border-r-2 border-amber-900/50"></div>
+              <div className="absolute bottom-0 left-0 w-2 h-2 border-b-2 border-l-2 border-amber-900/50"></div>
+              <div className="absolute bottom-0 right-0 w-2 h-2 border-b-2 border-r-2 border-amber-900/50"></div>
+              
+              <div className="flex items-center gap-2 mb-1.5">
+                <Tag className="w-3.5 h-3.5 text-amber-800" />
+                <span className="text-xs font-serif text-amber-900 font-semibold">최근 본 기록</span>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {recentViewed.map((date, index) => {
+                  // 날짜 포맷: 2024-12-30 → 12월 30일
+                  const formatDate = (dateStr: string) => {
+                    try {
+                      const d = new Date(dateStr);
+                      return `${d.getMonth() + 1}월 ${d.getDate()}일`;
+                    } catch {
+                      return dateStr;
+                    }
+                  };
+
+                  return (
+                    <button
+                      key={index}
+                      onClick={async () => {
+                        // 해당 날짜의 기록 검색
+                        const results = await historyDB.getByDateRange(date, date);
+                        if (results.length > 0) {
+                          setHistoryContent(results);
+                          setFilteredContent(results);
+                          setAppState(AppState.READING);
+                          setFlipTrigger((prev: number) => prev + 1);
+                        }
+                      }}
+                      className="px-2.5 py-0.5 rounded-full text-xs font-serif transition-all bg-amber-100 text-amber-800 hover:bg-amber-200 hover:text-amber-900 border border-amber-300 shadow-sm"
+                    >
+                      {formatDate(date)}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 태그 필터 */}
+        {availableTags && availableTags.length > 0 && (
+          <div className="w-full px-2">
+            <div className="relative bg-amber-50/90 backdrop-blur-sm border-2 border-amber-900/40 rounded-lg p-2 shadow-lg">
+              {/* 모서리 장식 */}
+              <div className="absolute top-0 left-0 w-2 h-2 border-t-2 border-l-2 border-amber-900/50"></div>
+              <div className="absolute top-0 right-0 w-2 h-2 border-t-2 border-r-2 border-amber-900/50"></div>
+              <div className="absolute bottom-0 left-0 w-2 h-2 border-b-2 border-l-2 border-amber-900/50"></div>
+              <div className="absolute bottom-0 right-0 w-2 h-2 border-b-2 border-r-2 border-amber-900/50"></div>
+              
+              <div className="flex items-center gap-2 mb-1.5">
+                <Tag className="w-3.5 h-3.5 text-amber-800" />
+                <span className="text-xs font-serif text-amber-900 font-semibold">검색 기록</span>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                <button
+                  onClick={() => setSelectedTag('')}
+                  className={`px-2.5 py-0.5 rounded-full text-xs font-serif transition-all border shadow-sm ${
+                    !selectedTag
+                      ? 'bg-amber-700 text-amber-100 border-amber-800 shadow-md'
+                      : 'bg-amber-100 text-amber-800 hover:bg-amber-200 border-amber-300'
+                  }`}
+                >
+                  {KOREAN_UI_TEXTS.allTags} ({historyContent.length})
+                </button>
+                {availableTags.map(tag => {
+                  const count = historyContent.filter(item => item.tags.includes(tag)).length;
+                  return (
+                    <button
+                      key={tag}
+                      onClick={() => handleTagSelect(tag)}
+                      className={`px-2.5 py-0.5 rounded-full text-xs font-serif transition-all border shadow-sm ${
+                        selectedTag === tag
+                          ? 'bg-amber-700 text-amber-100 border-amber-800 shadow-md'
+                          : 'bg-amber-100 text-amber-800 hover:bg-amber-200 border-amber-300'
+                      }`}
+                    >
+                      {tag} ({count})
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div className="flex w-full justify-between items-start px-2">
+            <div className="flex flex-wrap gap-2 text-xs font-serif text-amber-800/60">
+              {availableTags.length > 0 ? (
+                // DB에서 가져온 태그들을 추천 검색어로 표시 (최대 5개)
+                availableTags.slice(0, 5).map(topic => (
+                  <button
+                    key={topic}
+                    type="button"
+                    onClick={() => { setQuery(topic); handleSearch(topic); }}
+                    className="hover:text-amber-500 transition-colors cursor-pointer border-b border-transparent hover:border-amber-500"
+                  >
+                    {topic}
+                  </button>
+                ))
+              ) : (
+                // DB에 태그가 없으면 기본 추천 검색어 표시
+                KOREAN_UI_TEXTS.suggestedTopics.map(topic => (
+                  <button
+                    key={topic}
+                    type="button"
+                    onClick={() => { setQuery(topic); handleSearch(topic); }}
+                    className="hover:text-amber-500 transition-colors cursor-pointer border-b border-transparent hover:border-amber-500"
+                  >
+                    {topic}
+                  </button>
+                ))
+              )}
+            </div>
+
+            {historyContent && historyContent.length > 0 && (
+              <button
+                onClick={clearHistory}
+                className="text-amber-900/40 hover:text-red-900/60 transition-colors text-xs flex items-center gap-1 font-serif"
+                title="Burn Book (Reset)"
+              >
+                <Trash2 className="w-3 h-3" />
+                <span>{KOREAN_UI_TEXTS.reset}</span>
+              </button>
+            )}
+        </div>
+      </div>
+
+      {/* 메인 책 디스플레이 영역 */}
+      <main className="flex-1 w-full flex items-center justify-center px-4 z-10 overflow-hidden">
+        <ErrorBoundary>
+          {appState === AppState.ERROR ? (
+            <div className="text-center text-red-900 bg-[#f3e5ab] p-8 rounded shadow-lg font-serif border border-red-800 max-w-md mx-4">
+              <h3 className="text-xl font-bold mb-2">{KOREAN_UI_TEXTS.errorTitle}</h3>
+              <p>{KOREAN_UI_TEXTS.errorMessage}</p>
+              <p className="text-sm mt-2 opacity-75 font-sans whitespace-pre-wrap">{errorMessage}</p>
+              <button
+                onClick={() => setAppState(AppState.IDLE)}
+                className="mt-4 text-xs uppercase tracking-widest border-b border-red-900/30 hover:border-red-900 pb-1 transition-all"
+              >
+                다시 시도
+              </button>
+            </div>
+          ) : (
+            <Grimoire
+              content={filteredContent}
+              isLoading={appState === AppState.LOADING}
+              flipTrigger={flipTrigger}
+              onDataChange={loadHistory}
+            />
+          )}
+        </ErrorBoundary>
+      </main>
+
+      <footer className="w-full text-center py-1 text-amber-900/20 font-serif text-[9px] tracking-widest z-20 uppercase flex-shrink-0">
+        M M X X V  ·  G R I M O I R E
+      </footer>
+      </div>
+      </div>
       </div>
     </MainLayout>
   );

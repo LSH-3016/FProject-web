@@ -1,14 +1,44 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { MainLayout } from "@/components/layout/MainLayout";
-import { FolderOpen, Image, FileText, Film, MoreVertical, File, X } from "lucide-react";
+import { FolderOpen, Image, FileText, Film, MoreVertical, File, X, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import CircularGallery from "@/components/CircularGallery";
 import { useNavigate } from "react-router-dom";
 import { useLibraryContext } from "@/contexts/LibraryContext";
-import { libraryTypeConfigs } from "@/data/libraryMockData";
-import { LibraryItemType, LibraryItemVisibility } from "@/types/library";
+import { LibraryItemType, LibraryItemVisibility, LibraryTypeConfig } from "@/types/library";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AddItemModal } from "@/components/library/AddItemModal";
+
+const libraryTypeConfigs: LibraryTypeConfig[] = [
+  {
+    type: "image",
+    label: "사진",
+    icon: "Image",
+    color: "type-image",
+    route: "/library/image",
+  },
+  {
+    type: "document",
+    label: "문서",
+    icon: "FileText",
+    color: "type-document",
+    route: "/library/document",
+  },
+  {
+    type: "file",
+    label: "파일",
+    icon: "Folder",
+    color: "type-file",
+    route: "/library/file",
+  },
+  {
+    type: "video",
+    label: "동영상",
+    icon: "Video",
+    color: "type-video",
+    route: "/library/video",
+  },
+];
 
 const getIcon = (type: "image" | "document" | "video" | "file") => {
   switch (type) {
@@ -39,7 +69,7 @@ const LibraryPage = () => {
   });
   const uploadMenuRef = useRef<HTMLDivElement | null>(null);
   const navigate = useNavigate();
-  const { getLatestItemByType, getItemCountByType, getItemsByType, addItem, items } = useLibraryContext();
+  const { getLatestItemByType, getItemCountByType, getItemsByType, addItem, items, loading, error } = useLibraryContext();
 
   const formatDate = (value?: string | Date) => {
     if (!value) {
@@ -68,6 +98,9 @@ const LibraryPage = () => {
 
   // CircularGallery용 이미지 데이터 준비
   const galleryItems = useMemo(() => {
+    // API 연동 실패 시 빈 배열 반환 (기본 이미지 사용 안 함)
+    if (error) return [];
+    
     const imageItems = items
       .filter(item => item.type === 'image' && item.thumbnail)
       .slice(0, 30) // 최신 30개만 사용
@@ -76,8 +109,8 @@ const LibraryPage = () => {
         text: item.name
       }));
     
-    return imageItems.length > 0 ? imageItems : undefined;
-  }, [items]);
+    return imageItems.length > 0 ? imageItems : [];
+  }, [items, error]);
 
   useEffect(() => {
     // 드롭다운이 열려 있을 때 바깥 클릭으로 닫기
@@ -166,6 +199,20 @@ const LibraryPage = () => {
             </p>
           </header>
 
+          {/* API 연동 실패 에러 메시지 */}
+          {error && (
+            <div className="mb-8 p-6 rounded-lg border border-red-200 bg-red-50/50 paper-texture">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="w-6 h-6 text-red-600 flex-shrink-0 mt-0.5" />
+                <div>
+                  <h3 className="font-serif text-lg text-red-900 mb-1">API 연동 실패</h3>
+                  <p className="font-serif text-sm text-red-700">{error}</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* CircularGallery - 항상 표시 */}
           <div className="w-full h-[450px] my-8 relative rounded-2xl bg-black/5 overflow-hidden border border-[#D9C5B2]/20 shadow-inner">
             <CircularGallery 
               key="main-gallery" 
@@ -320,7 +367,7 @@ const LibraryPage = () => {
           </div>
 
           {/* Empty state */}
-          {typeCards.length === 0 && (
+          {typeCards.length === 0 && !loading && (
             <div className="text-center py-20 paper-texture rounded-lg">
               <FolderOpen className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
               <p className="font-handwriting text-xl text-muted-foreground">

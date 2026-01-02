@@ -6,9 +6,39 @@ import { LibraryItemCard } from "@/components/library/LibraryItemCard";
 import { DeleteConfirmModal } from "@/components/library/DeleteConfirmModal";
 import { AddItemModal } from "@/components/library/AddItemModal";
 import { useLibraryContext } from "@/contexts/LibraryContext";
-import { libraryTypeConfigs } from "@/data/libraryMockData";
-import { LibraryItem, LibraryItemType, LibraryItemVisibility } from "@/types/library";
+import { LibraryItem, LibraryItemType, LibraryItemVisibility, LibraryTypeConfig } from "@/types/library";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+
+const libraryTypeConfigs: LibraryTypeConfig[] = [
+  {
+    type: "image",
+    label: "사진",
+    icon: "Image",
+    color: "type-image",
+    route: "/library/image",
+  },
+  {
+    type: "document",
+    label: "문서",
+    icon: "FileText",
+    color: "type-document",
+    route: "/library/document",
+  },
+  {
+    type: "file",
+    label: "파일",
+    icon: "Folder",
+    color: "type-file",
+    route: "/library/file",
+  },
+  {
+    type: "video",
+    label: "동영상",
+    icon: "Video",
+    color: "type-video",
+    route: "/library/video",
+  },
+];
 
 const LibraryDetailPage = () => {
   const { type } = useParams<{ type: string }>();

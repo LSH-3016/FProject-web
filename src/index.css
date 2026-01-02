@@ -226,3 +226,24 @@
 .animate-book-open {
   animation: inkFade 0.8s ease-out forwards;
 }
+
+/* Index 페이지 헤더 스타일 - 고정 크기 */
+.header-title {
+  font-size: 3.5rem !important;
+  font-family: 'Nanum Myeongjo', serif !important;
+  font-weight: 700 !important;
+}
+
+.header-subtitle {
+  font-size: 2.5rem !important;
+  font-family: 'Nanum Pen Script', cursive !important;
+}
+
+/* ======================================================
+   SCROLLBAR STYLES (스크롤바 화살표 제거)
+   ====================================================== */
+::-webkit-scrollbar-button {
+  display: none !important;
+  height: 0 !important;
+  width: 0 !important;
+}

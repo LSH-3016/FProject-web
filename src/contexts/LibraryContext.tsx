@@ -1,6 +1,5 @@
 import { createContext, useCallback, useContext, useMemo, useState, useEffect } from "react";
 import { LibraryItem, LibraryItemType, LibraryItemVisibility } from "@/types/library";
-import { initialMockItems } from "@/data/libraryMockData";
 import { apiService } from "@/services/api";
 
 interface LibraryContextType {
@@ -19,7 +18,7 @@ interface LibraryContextType {
 const LibraryContext = createContext<LibraryContextType | undefined>(undefined);
 
 export function LibraryProvider({ children }: { children: React.ReactNode }) {
-  const [items, setItems] = useState<LibraryItem[]>(initialMockItems);
+  const [items, setItems] = useState<LibraryItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -34,10 +33,8 @@ export function LibraryProvider({ children }: { children: React.ReactNode }) {
       setItems(fetchedItems);
     } catch (err) {
       console.error("라이브러리 아이템 조회 실패:", err);
-      setError(err instanceof Error ? err.message : "아이템을 불러오는데 실패했습니다");
-      
-      // 에러 시 로컬 더미 데이터 사용 (개발용)
-      setItems(initialMockItems);
+      setError(err instanceof Error ? err.message : "API 연동에 실패했습니다");
+      setItems([]);
     } finally {
       setLoading(false);
     }

@@ -1,28 +1,35 @@
 import { MainLayout } from "@/components/layout/MainLayout";
 import { JournalBook } from "@/components/journal/JournalBook";
+import { useMemo } from "react";
 
 const Index = () => {
+  // 배경 스타일 메모이제이션
+  const backgroundStyle = useMemo(() => ({
+    backgroundImage: 'url(/journal-bg.jpg)',
+    backgroundSize: 'cover' as const,
+    backgroundPosition: 'center' as const,
+    backgroundRepeat: 'no-repeat' as const,
+    backgroundAttachment: 'fixed' as const
+  }), []);
+
   return (
     <MainLayout>
-      {/* 1. items-center 제거! -> 자식들이 가로로 꽉 찰 수 있게 됨 */}
-      <div className="min-h-screen flex flex-col justify-center py-12 w-full px-4">
-        
-        {/* Header는 스스로 중앙 정렬 유지 */}
-        <header className="text-center mb-8 animate-fade-in w-full">
-          <h1 className="font-serif text-3xl md:text-5xl text-primary mb-3 gold-accent">
-            기록실
-          </h1>
-          <p className="font-handwriting text-2xl text-muted-foreground">
-            나의 추억을 기록으로 남겨보세요!
-          </p>
-        </header>
+      <div className="min-h-screen relative">
+        {/* 고정 배경 레이어 */}
+        <div className="fixed inset-0 pointer-events-none" style={backgroundStyle}>
+          {/* 다크 오버레이 */}
+          <div className="absolute inset-0 bg-black/40"></div>
+        </div>
 
-        {/* 2. JournalBook을 위한 래퍼 생성
-             w-full: 부모 너비 100% 차지
-             flex justify-center: 내부의 JournalBook(max-w-7xl)을 화면 중앙에 배치
-        */}
-        <div className="w-full flex justify-center animate-fade-in">
-          <JournalBook />
+        {/* 콘텐츠 레이어 */}
+        <div className="relative z-10 min-h-screen flex flex-col justify-center py-12 w-full px-4">
+          
+          {/* JournalBook을 위한 래퍼 - 크기 증가 */}
+          <div className="w-full max-w-[1400px] mx-auto flex justify-center animate-fade-in">
+            <div className="w-full scale-110">
+              <JournalBook />
+            </div>
+          </div>
         </div>
       </div>
     </MainLayout>

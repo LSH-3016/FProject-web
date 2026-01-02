@@ -589,7 +589,8 @@ class App {
         text: 'Palm Trees'
       }
     ];
-    const galleryItems = items && items.length ? items : defaultItems;
+    // 빈 배열이 전달되면 빈 배열 사용, undefined나 null이면 기본 이미지 사용
+    const galleryItems = (items !== undefined && items.length === 0) ? [] : (items && items.length ? items : defaultItems);
     this.mediasImages = galleryItems.concat(galleryItems);
     this.medias = this.mediasImages.map((data, index) => {
       return new Media({
@@ -749,7 +750,7 @@ class App {
     // Only auto-scroll when not paused.
     if (!this.isPaused) {
       if (this.autoScrollDirection !== 0) {
-        this.scroll.target += 0.02 * -this.autoScrollDirection;
+        this.scroll.target += 0.08 * -this.autoScrollDirection;  // 0.02 → 0.01 (느리게)
       }
     }
     if (this.medias) {

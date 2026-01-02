@@ -21,6 +21,7 @@ interface SummaryDialogProps {
   entriesCount: number;
   selectedImage: File | null;
   existingS3Key: string | null;
+  existingImageUrl: string | null;
   isCheckingS3Key: boolean;
   onProceedToResult: () => void;
   onSaveToHistory: () => void;
@@ -38,6 +39,7 @@ export const SummaryDialog = ({
   entriesCount,
   selectedImage,
   existingS3Key,
+  existingImageUrl,
   isCheckingS3Key,
   onProceedToResult,
   onSaveToHistory,
@@ -152,9 +154,12 @@ export const SummaryDialog = ({
                     {summaryResult?.summary || "요약을 불러오는 중입니다..."}
                   </div>
                   
+                  {/* 새로 선택한 사진 미리보기 */}
                   {selectedImage && (
                     <div className="mt-6 space-y-2">
-                      <p className="text-sm font-serif text-stone-600">첨부된 사진</p>
+                      <p className="text-sm font-serif text-stone-600">
+                        {existingS3Key ? '변경할 사진' : '첨부된 사진'}
+                      </p>
                       <div className="relative group inline-block">
                         <img 
                           src={URL.createObjectURL(selectedImage)} 
@@ -171,19 +176,32 @@ export const SummaryDialog = ({
                     </div>
                   )}
                   
-                  {/* 기존 사진 미리보기 - 추후 API 구현 후 활성화 예정
-                  {existingS3Key && !selectedImage && (
+                  {/* 기존 사진 미리보기 */}
+                  {existingS3Key && existingImageUrl && !selectedImage && (
                     <div className="mt-6 space-y-2">
                       <p className="text-sm font-serif text-stone-600">기존 첨부 사진</p>
-                      <div className="inline-block p-3 bg-stone-100 rounded border border-stone-300">
-                        <div className="flex items-center gap-2 text-stone-600">
-                          <Image className="w-4 h-4" />
-                          <span className="text-sm">사진이 첨부되어 있습니다</span>
-                        </div>
+                      <div className="relative group inline-block">
+                        <img 
+                          src={existingImageUrl} 
+                          alt="기존 사진"
+                          className="w-32 h-32 object-cover rounded border border-stone-300"
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none';
+                            e.currentTarget.parentElement!.innerHTML = `
+                              <div class="inline-block p-3 bg-stone-100 rounded border border-stone-300">
+                                <div class="flex items-center gap-2 text-stone-600">
+                                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                  </svg>
+                                  <span class="text-sm">사진이 첨부되어 있습니다</span>
+                                </div>
+                              </div>
+                            `;
+                          }}
+                        />
                       </div>
                     </div>
                   )}
-                  */}
                 </div>
 
                 <div className="shrink-0 pt-4 mt-2 border-t border-stone-300/50 flex items-center justify-between text-stone-500 text-sm font-serif">
@@ -209,13 +227,12 @@ export const SummaryDialog = ({
                         확인중...
                       </Button>
                     ) : existingS3Key ? (
-                      /* 기존 사진이 있는 경우 - 사진 변경 버튼 (비활성화) */
+                      /* 기존 사진이 있는 경우 - 사진 변경 버튼 */
                       <Button 
                         variant="ghost" 
                         size="sm" 
-                        disabled
-                        className="hover:bg-stone-200/50 hover:text-stone-800 opacity-50 cursor-not-allowed"
-                        title="사진 변경 기능은 추후 지원 예정입니다"
+                        onClick={() => imageInputRef.current?.click()}
+                        className="hover:bg-stone-200/50 hover:text-stone-800"
                       >
                         <Image className="w-4 h-4 mr-1" />
                         사진변경

@@ -148,4 +148,116 @@ export class JournalApiService {
       return msgDateStr === todayStr;
     });
   }
+
+  // === History 관련 메서드 추가 ===
+
+  // 전체 히스토리 조회
+  async getAllHistory(userId: string, limit: number = 100, offset: number = 0): Promise<any[]> {
+    const response = await fetch(`${this.apiBaseUrl}/history?user_id=${userId}&limit=${limit}&offset=${offset}`);
+    
+    if (!response.ok) {
+      throw new Error(`히스토리 조회 실패: ${response.status}`);
+    }
+    
+    return await response.json();
+  }
+
+  // 특정 히스토리 조회
+  async getHistoryById(historyId: string): Promise<any> {
+    const response = await fetch(`${this.apiBaseUrl}/history/${historyId}`);
+    
+    if (!response.ok) {
+      throw new Error(`히스토리 조회 실패: ${response.status}`);
+    }
+    
+    return await response.json();
+  }
+
+  // 히스토리 삭제
+  async deleteHistory(historyId: string): Promise<void> {
+    const response = await fetch(`${this.apiBaseUrl}/history/${historyId}`, {
+      method: 'DELETE'
+    });
+    
+    if (!response.ok) {
+      throw new Error(`히스토리 삭제 실패: ${response.status}`);
+    }
+  }
+
+  // 날짜 범위로 히스토리 조회
+  async getHistoryByDateRange(userId: string, startDate: string, endDate: string, limit: number = 100, offset: number = 0): Promise<any[]> {
+    const response = await fetch(`${this.apiBaseUrl}/history/date-range?user_id=${userId}&start_date=${startDate}&end_date=${endDate}&limit=${limit}&offset=${offset}`);
+    
+    if (!response.ok) {
+      throw new Error(`날짜 범위 조회 실패: ${response.status}`);
+    }
+    
+    return await response.json();
+  }
+
+  // 히스토리 검색
+  async searchHistory(userId: string, query: string, limit: number = 100, offset: number = 0): Promise<any[]> {
+    const response = await fetch(`${this.apiBaseUrl}/history/search?user_id=${userId}&q=${encodeURIComponent(query)}&limit=${limit}&offset=${offset}`);
+    
+    if (!response.ok) {
+      throw new Error(`검색 실패: ${response.status}`);
+    }
+    
+    return await response.json();
+  }
+
+  // 태그로 히스토리 검색
+  async searchHistoryByTags(userId: string, tags: string[], matchAll: boolean = false, limit: number = 100, offset: number = 0): Promise<any[]> {
+    const tagsParam = tags.join(',');
+    const response = await fetch(`${this.apiBaseUrl}/history/tags?user_id=${userId}&tags=${encodeURIComponent(tagsParam)}&match_all=${matchAll}&limit=${limit}&offset=${offset}`);
+    
+    if (!response.ok) {
+      throw new Error(`태그 검색 실패: ${response.status}`);
+    }
+    
+    return await response.json();
+  }
+
+  // 모든 태그 가져오기
+  async getAllHistoryTags(userId: string): Promise<string[]> {
+    const response = await fetch(`${this.apiBaseUrl}/history/tags/list?user_id=${userId}`);
+    
+    if (!response.ok) {
+      throw new Error(`태그 조회 실패: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    return data.tags || [];
+  }
+
+  // 히스토리 통계
+  async getHistoryStats(userId: string, period: string = 'month'): Promise<any> {
+    const response = await fetch(`${this.apiBaseUrl}/history/stats?user_id=${userId}&period=${period}`);
+    
+    if (!response.ok) {
+      throw new Error(`통계 조회 실패: ${response.status}`);
+    }
+    
+    return await response.json();
+  }
+
+  // S3 키로 파일 URL 가져오기 (Library API 사용)
+  async getFileUrlFromS3Key(s3Key: string): Promise<string | null> {
+    try {
+      // Library API URL 가져오기
+      const libraryApiUrl = import.meta.env.VITE_LIBRARY_API_URL || "http://192.168.0.138:8000/api/v1";
+      const response = await fetch(`${libraryApiUrl}/library-items/url-by-key?s3_key=${encodeURIComponent(s3Key)}`);
+
+      if (!response.ok) {
+        console.error(`S3 URL 조회 실패: ${response.status}`);
+        return null;
+      }
+
+      const result = await response.json();
+      return result.data?.file_url || result.file_url || null;
+    } catch (error) {
+      console.error('S3 URL 조회 중 오류:', error);
+      return null;
+    }
+  }
 }

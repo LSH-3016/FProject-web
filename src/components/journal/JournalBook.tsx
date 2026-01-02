@@ -65,6 +65,7 @@ export const JournalBook = () => {
     isSavingHistory,
     selectedImage,
     existingS3Key,
+    existingImageUrl,
     isCheckingS3Key,
     handleOpenAnalysis,
     proceedToResult,
@@ -175,13 +176,21 @@ export const JournalBook = () => {
   return (
     <div className="w-full max-w-7xl mx-auto space-y-6 p-4">
       {/* 메인 화면 */}
-      <div className="library-card p-6 md:p-8 animate-slide-up border rounded-xl shadow-sm bg-card">
+      <div 
+        className="library-card p-6 md:p-8 animate-slide-up border rounded-xl bg-card"
+        style={{
+          boxShadow: `
+            0 20px 40px -10px rgba(0, 0, 0, 0.3),
+            0 8px 16px -6px rgba(0, 0, 0, 0.2)
+          `
+        }}
+      >
         <div className="flex items-center gap-3 mb-6">
           <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
             <Feather className="w-5 h-5 text-primary" />
           </div>
           <div>
-            <h2 className="font-display text-xl font-semibold text-foreground">오늘의 추억</h2>
+            <h2 className="font-display text-xl font-semibold text-foreground">오늘의 추억 기록</h2>
             <p className="text-sm text-muted-foreground">오늘은 어떤 일이 있었나요?</p>
           </div>
         </div>
@@ -272,6 +281,7 @@ export const JournalBook = () => {
         entriesCount={entries.length}
         selectedImage={selectedImage}
         existingS3Key={existingS3Key}
+        existingImageUrl={existingImageUrl}
         isCheckingS3Key={isCheckingS3Key}
         onProceedToResult={proceedToResult}
         onSaveToHistory={checkAndSaveToHistory}
