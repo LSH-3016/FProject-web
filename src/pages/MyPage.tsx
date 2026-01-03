@@ -2,18 +2,18 @@ import type React from "react";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { MainLayout } from "@/components/layout/MainLayout";
+import { useAuth } from "@/hooks/useAuth";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { toast } from "@/hooks/use-toast";
 import {
   User,
   MessageCircle,
   AlertTriangle,
   Edit,
   LogOut,
-  Rocket,
-  Award,
-  Target,
-  CheckCircle2,
   Lock,
   X,
+  Loader2,
 } from "lucide-react";
 
 const cn = (...classes: Array<string | false | null | undefined>) =>
@@ -35,12 +35,6 @@ const menuItems: MenuItem[] = [
     description: "궁금한 점을 물어보세요",
   },
   {
-    id: "assistant",
-    label: "도우미",
-    icon: Rocket,
-    description: "작은 우주선이 도와드려요",
-  },
-  {
     id: "report",
     label: "회원 신고",
     icon: AlertTriangle,
@@ -51,6 +45,12 @@ const menuItems: MenuItem[] = [
     label: "정보 수정",
     icon: Edit,
     description: "프로필 정보를 변경하세요",
+  },
+  {
+    id: "changePassword",
+    label: "비밀번호 변경",
+    icon: Lock,
+    description: "계정 비밀번호를 변경하세요",
   },
   {
     id: "logout",
@@ -67,35 +67,11 @@ const menuItems: MenuItem[] = [
   },
 ];
 
-const achievementHighlights = [
-  { icon: "🌟", label: "첫 기록", earned: true },
-  { icon: "🔥", label: "7일 연속", earned: true },
-  { icon: "📸", label: "사진 50장", earned: true },
-  { icon: "🧭", label: "30일 연속", earned: false },
-];
-
-const allAchievements = [
-  { label: "첫 기록", earned: true },
-  { label: "7일 연속", earned: true },
-  { label: "30일 연속", earned: false },
-  { label: "100일 연속", earned: false },
-  { label: "1년 연속", earned: false },
-  { label: "2년 연속", earned: false },
-  { label: "3년 연속", earned: false },
-  { label: "첫 사진", earned: true },
-  { label: "사진 10장", earned: true },
-  { label: "사진 30장", earned: true },
-  { label: "사진 50장", earned: true },
-  { label: "사진 100장", earned: false },
-  { label: "사진 200장", earned: false },
-  { label: "사진 300장", earned: false },
-  { label: "사진 400장", earned: false },
-  { label: "사진 500장", earned: false },
-];
-
 const MyPage = () => {
   const navigate = useNavigate();
-  const [isAchievementsOpen, setIsAchievementsOpen] = useState(false);
+  const { logout } = useAuth();
+  const { displayName, email, userId } = useCurrentUser();
+  const [isLoading, setIsLoading] = useState(false);
   const [isWithdrawOpen, setIsWithdrawOpen] = useState(false);
   const [isWithdrawAgreed, setIsWithdrawAgreed] = useState(false);
   const [isWithdrawCompleteOpen, setIsWithdrawCompleteOpen] = useState(false);
@@ -105,37 +81,154 @@ const MyPage = () => {
   const [isReportCompleteOpen, setIsReportCompleteOpen] = useState(false);
   const [isInquiryOpen, setIsInquiryOpen] = useState(false);
   const [isInquiryCompleteOpen, setIsInquiryCompleteOpen] = useState(false);
-  const [isAssistantOpen, setIsAssistantOpen] = useState(false);
-  const [assistantMessages, setAssistantMessages] = useState<
-    Array<{ id: number; role: "user" | "assistant"; text: string }>
-  >([
-    {
-      id: 1,
-      role: "assistant",
-      text: "안녕하세요! 궁금한 내용을 입력해 주세요.",
-    },
-  ]);
-  const [assistantInput, setAssistantInput] = useState("");
-  const assistantScrollRef = useRef<HTMLDivElement | null>(null);
-  const defaultNickname = "상호상사";
+  const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
+  const [isChangePasswordCompleteOpen, setIsChangePasswordCompleteOpen] = useState(false);
+  const [isVerifyCodeOpen, setIsVerifyCodeOpen] = useState(false);
+  
+  // Password change state
+  const [verificationCode, setVerificationCode] = useState("");
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  
+  // Report form state
+  const [reportedUserId, setReportedUserId] = useState("");
+  const [reportReason, setReportReason] = useState<'spam' | 'harassment' | 'inappropriate_content' | 'other'>('spam');
+  const [reportDescription, setReportDescription] = useState("");
+  
+  // Inquiry form state
+  const [inquirySubject, setInquirySubject] = useState("");
+  const [inquiryMessage, setInquiryMessage] = useState("");
+  
+  // 실제 사용자 정보 사용 (localStorage 대신)
+  const profileNickname = displayName || "사용자";
+  
+  // 프로필 이미지는 localStorage에서 가져오기 (추후 DB 연동 가능)
   const storedProfileImage =
     typeof window !== "undefined" ? localStorage.getItem("profileImage") : null;
-  const storedNickname =
-    typeof window !== "undefined"
-      ? localStorage.getItem("profileNickname")
-      : null;
   const profileImage = storedProfileImage ?? "";
-  const profileNickname = storedNickname ?? defaultNickname;
+  
+  // Helper function to get Cognito ID token
+  const getAuthToken = (): string | null => {
+    try {
+      // 방법 1: Cognito 표준 키 패턴으로 찾기
+      const clientId = import.meta.env.VITE_COGNITO_CLIENT_ID;
+      
+      if (!clientId) {
+        console.error('VITE_COGNITO_CLIENT_ID가 설정되지 않았습니다');
+        return null;
+      }
+      
+      // localStorage에서 Cognito 관련 모든 키 찾기
+      const cognitoKeys = Object.keys(localStorage).filter(key => 
+        key.includes('CognitoIdentityServiceProvider') && 
+        key.includes(clientId) &&
+        key.endsWith('.idToken')
+      );
+      
+      console.log('🔍 MyPage - Cognito 토큰 키 검색:', cognitoKeys);
+      
+      if (cognitoKeys.length > 0) {
+        const token = localStorage.getItem(cognitoKeys[0]);
+        console.log('✅ MyPage - 토큰 발견:', token ? '있음' : '없음');
+        
+        // 빈 문자열 체크
+        if (token && token.trim().length > 0) {
+          return token;
+        }
+        console.warn('⚠️ MyPage - 토큰이 비어있습니다');
+      }
+      
+      // 방법 2: user 정보가 있으면 직접 키 생성
+      if (userId) {
+        const tokenKey = `CognitoIdentityServiceProvider.${clientId}.${userId}.idToken`;
+        const token = localStorage.getItem(tokenKey);
+        console.log('🔍 MyPage - 직접 키로 검색:', tokenKey, token ? '있음' : '없음');
+        
+        // 빈 문자열 체크
+        if (token && token.trim().length > 0) {
+          return token;
+        }
+      }
+      
+      console.warn('⚠️ MyPage - 토큰을 찾을 수 없습니다');
+      return null;
+    } catch (error) {
+      console.error('❌ MyPage - 토큰 가져오기 실패:', error);
+      return null;
+    }
+  };
 
   const closeWithdrawModal = () => {
     setIsWithdrawOpen(false);
     setIsWithdrawAgreed(false);
   };
 
-  const handleWithdrawConfirm = () => {
-    setIsWithdrawOpen(false);
-    setIsWithdrawAgreed(false);
-    setIsWithdrawCompleteOpen(true);
+  const handleWithdrawConfirm = async () => {
+    if (!userId) {
+      toast({
+        title: "오류",
+        description: "사용자 인증 정보가 없습니다.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      const token = getAuthToken();
+
+      if (!token) {
+        toast({
+          title: "오류",
+          description: "인증 토큰을 찾을 수 없습니다. 다시 로그인해주세요.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Call backend API to delete account
+      const response = await fetch(`${import.meta.env.VITE_COGNITO_API_URL}/api/user/account`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || '회원 탈퇴에 실패했습니다.');
+      }
+
+      // Close modal and show completion message
+      setIsWithdrawOpen(false);
+      setIsWithdrawAgreed(false);
+      setIsWithdrawCompleteOpen(true);
+
+      // Sign out and redirect after 2 seconds
+      setTimeout(async () => {
+        try {
+          await logout();
+        } catch (err) {
+          console.error('로그아웃 실패:', err);
+        } finally {
+          navigate('/');
+        }
+      }, 2000);
+
+    } catch (error) {
+      console.error("회원 탈퇴 실패:", error);
+      toast({
+        title: "회원 탈퇴 실패",
+        description: error instanceof Error ? error.message : "회원 탈퇴에 실패했습니다. 다시 시도해주세요.",
+        variant: "destructive",
+      });
+      setIsWithdrawOpen(false);
+      setIsWithdrawAgreed(false);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const closeWithdrawCompleteModal = () => {
@@ -150,9 +243,23 @@ const MyPage = () => {
     setIsLogoutConfirmOpen(false);
   };
 
-  const handleLogoutConfirm = () => {
-    setIsLogoutConfirmOpen(false);
-    setIsLogoutCompleteOpen(true);
+  const handleLogoutConfirm = async () => {
+    try {
+      await logout();
+      toast({
+        title: "로그아웃 완료",
+        description: "안전하게 로그아웃되었습니다.",
+      });
+      setIsLogoutConfirmOpen(false);
+      navigate("/", { replace: true }); // 메인 페이지로 이동 (인트로 화면)
+    } catch (error) {
+      toast({
+        title: "로그아웃 실패",
+        description: "로그아웃 중 오류가 발생했습니다.",
+        variant: "destructive",
+      });
+      setIsLogoutConfirmOpen(false);
+    }
   };
 
   const closeLogoutComplete = () => {
@@ -161,11 +268,75 @@ const MyPage = () => {
 
   const closeReportModal = () => {
     setIsReportOpen(false);
+    setReportedUserId("");
+    setReportReason('spam');
+    setReportDescription("");
   };
 
-  const handleReportSubmit = () => {
-    setIsReportOpen(false);
-    setIsReportCompleteOpen(true);
+  const handleReportSubmit = async () => {
+    if (!userId) {
+      toast({
+        title: "오류",
+        description: "사용자 인증 정보가 없습니다.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!reportedUserId.trim()) {
+      toast({
+        title: "오류",
+        description: "신고할 회원의 닉네임 또는 아이디를 입력해주세요.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      const token = getAuthToken();
+      if (!token) {
+        toast({
+          title: "오류",
+          description: "인증 토큰을 찾을 수 없습니다. 다시 로그인해주세요.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const response = await fetch(`${import.meta.env.VITE_COGNITO_API_URL}/api/user/report`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          reported_user_identifier: reportedUserId,
+          reason: reportReason,
+          description: reportDescription || undefined,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || '신고 접수에 실패했습니다.');
+      }
+
+      setIsReportOpen(false);
+      setReportedUserId("");
+      setReportReason('spam');
+      setReportDescription("");
+      setIsReportCompleteOpen(true);
+    } catch (error) {
+      console.error("신고 접수 실패:", error);
+      toast({
+        title: "신고 접수 실패",
+        description: error instanceof Error ? error.message : "신고 접수에 실패했습니다. 다시 시도해주세요.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const closeReportComplete = () => {
@@ -174,11 +345,72 @@ const MyPage = () => {
 
   const closeInquiryModal = () => {
     setIsInquiryOpen(false);
+    setInquirySubject("");
+    setInquiryMessage("");
   };
 
-  const handleInquirySubmit = () => {
-    setIsInquiryOpen(false);
-    setIsInquiryCompleteOpen(true);
+  const handleInquirySubmit = async () => {
+    if (!userId) {
+      toast({
+        title: "오류",
+        description: "사용자 인증 정보가 없습니다.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!inquirySubject.trim() || !inquiryMessage.trim()) {
+      toast({
+        title: "오류",
+        description: "제목과 문의 내용을 모두 입력해주세요.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      const token = getAuthToken();
+      if (!token) {
+        toast({
+          title: "오류",
+          description: "인증 토큰을 찾을 수 없습니다. 다시 로그인해주세요.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const response = await fetch(`${import.meta.env.VITE_COGNITO_API_URL}/api/user/inquiry`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          subject: inquirySubject,
+          message: inquiryMessage,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || '문의 접수에 실패했습니다.');
+      }
+
+      setIsInquiryOpen(false);
+      setInquirySubject("");
+      setInquiryMessage("");
+      setIsInquiryCompleteOpen(true);
+    } catch (error) {
+      console.error("문의 접수 실패:", error);
+      toast({
+        title: "문의 접수 실패",
+        description: error instanceof Error ? error.message : "문의 접수에 실패했습니다. 다시 시도해주세요.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const closeInquiryComplete = () => {
@@ -186,46 +418,185 @@ const MyPage = () => {
   };
 
   const toggleAssistant = () => {
-    setIsAssistantOpen((prev) => !prev);
+    // Removed assistant feature
+  };
+
+  const closeChangePasswordModal = () => {
+    setIsChangePasswordOpen(false);
+    setCurrentPassword("");
+    setNewPassword("");
+    setConfirmPassword("");
+    setVerificationCode("");
+  };
+
+  const closeVerifyCodeModal = () => {
+    setIsVerifyCodeOpen(false);
+    setVerificationCode("");
+  };
+
+  const handleChangePasswordSubmit = async () => {
+    // 비밀번호 확인 검증
+    if (newPassword !== confirmPassword) {
+      toast({
+        title: "오류",
+        description: "새 비밀번호와 비밀번호 확인이 일치하지 않습니다.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!userId || !email) {
+      toast({
+        title: "오류",
+        description: "사용자 인증 정보가 없습니다.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      const token = getAuthToken();
+      if (!token) {
+        toast({
+          title: "오류",
+          description: "인증 토큰을 찾을 수 없습니다. 다시 로그인해주세요.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // 비밀번호 재설정 코드를 이메일로 전송
+      const response = await fetch(`${import.meta.env.VITE_COGNITO_API_URL}/api/user/password-reset`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: email,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || '비밀번호 변경 요청에 실패했습니다.');
+      }
+
+      // 첫번째 모달 닫고 인증 코드 입력 모달 열기
+      setIsChangePasswordOpen(false);
+      setIsVerifyCodeOpen(true);
+      
+      toast({
+        title: "인증 코드 전송",
+        description: "이메일로 인증 코드가 전송되었습니다.",
+      });
+    } catch (error) {
+      console.error("비밀번호 변경 실패:", error);
+      toast({
+        title: "비밀번호 변경 실패",
+        description: error instanceof Error ? error.message : "비밀번호 변경에 실패했습니다. 다시 시도해주세요.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleVerifyCodeSubmit = async () => {
+    if (!verificationCode.trim()) {
+      toast({
+        title: "오류",
+        description: "인증 코드를 입력해주세요.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!userId || !email) {
+      toast({
+        title: "오류",
+        description: "사용자 인증 정보가 없습니다.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      const token = getAuthToken();
+      if (!token) {
+        toast({
+          title: "오류",
+          description: "인증 토큰을 찾을 수 없습니다. 다시 로그인해주세요.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // 인증 코드로 비밀번호 변경 확인
+      const response = await fetch(`${import.meta.env.VITE_COGNITO_API_URL}/api/user/password-reset/confirm`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: email,
+          code: verificationCode,
+          newPassword: newPassword,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || '비밀번호 변경에 실패했습니다.');
+      }
+
+      // 성공 시 모든 모달 닫고 완료 모달 열기
+      setIsVerifyCodeOpen(false);
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+      setVerificationCode("");
+      setIsChangePasswordCompleteOpen(true);
+      
+      toast({
+        title: "비밀번호 변경 완료",
+        description: "비밀번호가 성공적으로 변경되었습니다.",
+      });
+    } catch (error) {
+      console.error("비밀번호 변경 실패:", error);
+      toast({
+        title: "비밀번호 변경 실패",
+        description: error instanceof Error ? error.message : "비밀번호 변경에 실패했습니다. 인증 코드를 확인해주세요.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const closeChangePasswordComplete = () => {
+    setIsChangePasswordCompleteOpen(false);
   };
 
   const handleAssistantSend = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const trimmed = assistantInput.trim();
-    if (!trimmed) {
-      return;
-    }
-    const userMessage = {
-      id: Date.now(),
-      role: "user" as const,
-      text: trimmed,
-    };
-    const replyMessage = {
-      id: Date.now() + 1,
-      role: "assistant" as const,
-      text: "현재는 데모 모드라 자동 응답만 제공됩니다.",
-    };
-    setAssistantMessages((prev) => [...prev, userMessage, replyMessage]);
-    setAssistantInput("");
+    // Removed assistant feature
   };
 
   useEffect(() => {
-    if (!isAssistantOpen) {
-      return;
-    }
-    const container = assistantScrollRef.current;
-    if (container) {
-      container.scrollTop = container.scrollHeight;
-    }
-  }, [assistantMessages, isAssistantOpen]);
+    // Removed assistant scroll effect
+  }, []);
 
   return (
     <MainLayout>
       <div className="min-h-screen py-12 px-4 bg-background">
         <div className="max-w-2xl mx-auto space-y-10">
-          {/* Profile / Level Section */}
+          {/* Profile Section */}
           <section className="bg-card rounded-xl shadow-md border border-border p-6">
-            <div className="flex items-center gap-4 mb-6">
+            <div className="flex items-center gap-4">
               <div className="relative">
                 <div className="w-20 h-20 rounded-full bg-secondary p-1">
                   <div className="w-full h-full rounded-full bg-background overflow-hidden flex items-center justify-center">
@@ -247,117 +618,9 @@ const MyPage = () => {
                 <h2 className="font-serif text-2xl text-primary gold-accent">
                   {profileNickname}님
                 </h2>
-                <p className="text-sm text-muted-foreground">
-                  레벨 3 · 경험치 85%
+                <p className="text-sm text-muted-foreground mt-1">
+                  {email}
                 </p>
-              </div>
-            </div>
-
-            {/* Progress */}
-            <div className="mb-6">
-              <div className="h-2 rounded-full bg-secondary overflow-hidden">
-                <div
-                  className="h-full bg-gradient-to-r from-yellow-700 to-yellow-500"
-                  style={{ width: "85%" }}
-                />
-              </div>
-              <div className="flex justify-between mt-2 text-xs text-muted-foreground">
-                <span>레벨 3</span>
-                <span>레벨 4까지 150P 남음</span>
-              </div>
-            </div>
-
-            {/* Stats */}
-            <div className="grid grid-cols-3 gap-4">
-              <div className="text-center p-4 rounded-lg bg-secondary/40">
-                <p className="text-2xl font-bold text-yellow-600">127</p>
-                <p className="text-sm text-muted-foreground">총 기록</p>
-              </div>
-              <div className="text-center p-4 rounded-lg bg-secondary/40">
-                <p className="text-2xl font-bold text-yellow-600">14</p>
-                <p className="text-sm text-muted-foreground">연속 기록</p>
-              </div>
-              <div className="text-center p-4 rounded-lg bg-secondary/40">
-                <p className="text-2xl font-bold text-yellow-600">2,450</p>
-                <p className="text-sm text-muted-foreground">포인트</p>
-              </div>
-            </div>
-          </section>
-
-          {/* Achievements */}
-          <section className="bg-card rounded-xl shadow-md border border-border p-6">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <Award className="w-5 h-5 text-yellow-600" />
-                <h3 className="font-semibold text-foreground">업적</h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsAchievementsOpen(true)}
-                className="text-sm text-yellow-600 hover:underline"
-              >
-                전체보기
-              </button>
-            </div>
-
-            <div className="grid grid-cols-4 gap-3">
-              {achievementHighlights.map((a, idx) => (
-                <div
-                  key={idx}
-                  className={cn(
-                    "flex flex-col items-center p-3 rounded-lg transition-all",
-                    a.earned
-                      ? "bg-yellow-700/10 border border-yellow-700/20"
-                      : "bg-secondary/30 opacity-50"
-                  )}
-                >
-                  <span className="text-2xl mb-1">{a.icon}</span>
-                  <span className="text-xs text-muted-foreground text-center">
-                    {a.label}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </section>
-
-          {/* Missions */}
-          <section className="bg-card rounded-xl shadow-md border border-border p-6">
-            <div className="flex items-center gap-2 mb-4">
-              <Target className="w-5 h-5 text-yellow-600" />
-              <h3 className="font-semibold text-foreground">
-                진행 중인 미션
-              </h3>
-            </div>
-
-            <div className="space-y-3">
-              <div className="flex items-center justify-between p-4 rounded-lg bg-secondary/40">
-                <div className="flex items-center gap-3">
-                  <span className="text-xl">📝</span>
-                  <div>
-                    <p className="text-sm font-medium text-foreground">
-                      오늘 5개의 감상 기록하기
-                    </p>
-                    <p className="text-xs text-muted-foreground">3/5 완료</p>
-                  </div>
-                </div>
-                <span className="text-xs text-yellow-600 font-medium">
-                  +50P
-                </span>
-              </div>
-
-              <div className="flex items-center justify-between p-4 rounded-lg bg-secondary/40">
-                <div className="flex items-center gap-3">
-                  <span className="text-xl">📷</span>
-                  <div>
-                    <p className="text-sm font-medium text-foreground">
-                      사진 업로드하기
-                    </p>
-                    <p className="text-xs text-muted-foreground">0/1 완료</p>
-                  </div>
-                </div>
-                <span className="text-xs text-yellow-600 font-medium">
-                  +30P
-                </span>
               </div>
             </div>
           </section>
@@ -369,7 +632,6 @@ const MyPage = () => {
                 .filter((item) => item.variant !== "danger")
                 .map((item, index, arr) => {
                   const Icon = item.icon;
-                  const isAssistant = item.id === "assistant";
                   const isLast = index === arr.length - 1;
 
                   return (
@@ -388,8 +650,8 @@ const MyPage = () => {
                         if (item.id === "inquiry") {
                           setIsInquiryOpen(true);
                         }
-                        if (item.id === "assistant") {
-                          toggleAssistant();
+                        if (item.id === "changePassword") {
+                          setIsChangePasswordOpen(true);
                         }
                       }}
                       className={cn(
@@ -401,11 +663,7 @@ const MyPage = () => {
 
                       <div className="flex items-center gap-4 pl-2">
                         <div className="w-10 h-10 flex items-center justify-center">
-                          {isAssistant ? (
-                            <Rocket className="w-6 h-6 text-yellow-600" />
-                          ) : (
-                            <Icon className="w-6 h-6 text-foreground/60 group-hover:text-yellow-600 transition-colors" />
-                          )}
+                          <Icon className="w-6 h-6 text-foreground/60 group-hover:text-yellow-600 transition-colors" />
                         </div>
 
                         <div className="flex-1">
@@ -465,81 +723,6 @@ const MyPage = () => {
           </div>
         </div>
       </div>
-
-      {isAchievementsOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
-          <button
-            type="button"
-            className="absolute inset-0 bg-black/60"
-            aria-label="닫기"
-            onClick={() => setIsAchievementsOpen(false)}
-          />
-          <div className="relative w-full max-w-2xl bg-card rounded-xl shadow-xl border border-border p-6 max-h-[80vh] overflow-auto">
-            <button
-              type="button"
-              className="absolute right-4 top-4 text-muted-foreground hover:text-foreground transition-colors"
-              onClick={() => setIsAchievementsOpen(false)}
-              aria-label="닫기"
-            >
-              <X className="w-5 h-5" />
-            </button>
-
-            <div className="flex items-center gap-2 mb-2">
-              <Award className="w-5 h-5 text-yellow-600" />
-              <h3 className="font-semibold text-foreground">업적 전체보기</h3>
-            </div>
-            <p className="text-sm text-muted-foreground mb-6">
-              전체 업적과 달성 여부를 확인할 수 있어요.
-            </p>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {allAchievements.map((achievement) => (
-                <div
-                  key={achievement.label}
-                  className={cn(
-                    "rounded-lg border p-4 transition-colors",
-                    achievement.earned
-                      ? "bg-yellow-700/10 border-yellow-700/20"
-                      : "bg-secondary/30 border-border"
-                  )}
-                >
-                  <div className="flex items-center gap-3">
-                    <div
-                      className={cn(
-                        "w-10 h-10 rounded-full flex items-center justify-center",
-                        achievement.earned
-                          ? "bg-yellow-700/10 text-yellow-700"
-                          : "bg-secondary text-muted-foreground"
-                      )}
-                    >
-                      {achievement.earned ? (
-                        <CheckCircle2 className="w-5 h-5" />
-                      ) : (
-                        <Lock className="w-5 h-5" />
-                      )}
-                    </div>
-                    <div className="flex-1">
-                      <p className="text-sm font-semibold text-foreground">
-                        {achievement.label}
-                      </p>
-                      <p
-                        className={cn(
-                          "text-xs",
-                          achievement.earned
-                            ? "text-yellow-700"
-                            : "text-muted-foreground"
-                        )}
-                      >
-                        {achievement.earned ? "달성" : "미달성"}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
 
       {isWithdrawOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
@@ -705,50 +888,64 @@ const MyPage = () => {
             <div className="space-y-4">
               <div className="space-y-2">
                 <label
-                  htmlFor="report-nickname"
-                  className="text-sm font-medium text-foreground"
-                >
-                  회원 닉네임
-                </label>
-                <input
-                  id="report-nickname"
-                  name="report-nickname"
-                  type="text"
-                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  placeholder="닉네임을 입력하세요"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label
                   htmlFor="report-userid"
                   className="text-sm font-medium text-foreground"
                 >
-                  회원 아이디
+                  닉네임 또는 회원 아이디 신고 *
                 </label>
                 <input
                   id="report-userid"
                   name="report-userid"
                   type="text"
+                  value={reportedUserId}
+                  onChange={(e) => setReportedUserId(e.target.value)}
                   className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  placeholder="아이디를 입력하세요"
+                  placeholder="닉네임 또는 아이디를 입력하세요"
+                  required
                 />
               </div>
 
               <div className="space-y-2">
                 <label
-                  htmlFor="report-reason"
+                  htmlFor="report-reason-select"
                   className="text-sm font-medium text-foreground"
                 >
-                  신고 사유
+                  신고 사유 *
+                </label>
+                <select
+                  id="report-reason-select"
+                  value={reportReason}
+                  onChange={(e) => setReportReason(e.target.value as any)}
+                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  required
+                >
+                  <option value="spam">스팸</option>
+                  <option value="harassment">괴롭힘</option>
+                  <option value="inappropriate_content">부적절한 콘텐츠</option>
+                  <option value="other">기타</option>
+                </select>
+              </div>
+
+              <div className="space-y-2">
+                <label
+                  htmlFor="report-description"
+                  className="text-sm font-medium text-foreground"
+                >
+                  상세 설명 (선택사항)
                 </label>
                 <textarea
-                  id="report-reason"
-                  name="report-reason"
+                  id="report-description"
+                  name="report-description"
+                  value={reportDescription}
+                  onChange={(e) => setReportDescription(e.target.value)}
                   rows={4}
+                  maxLength={1000}
                   className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  placeholder="신고 사유를 입력하세요"
+                  placeholder="신고 사유를 상세히 입력하세요 (최대 1000자)"
                 />
+                <p className="text-xs text-muted-foreground text-right">
+                  {reportDescription.length} / 1000
+                </p>
               </div>
             </div>
 
@@ -821,20 +1018,52 @@ const MyPage = () => {
               문의할 내용을 자유롭게 작성해주세요.
             </p>
 
-            <div className="space-y-2">
-              <label
-                htmlFor="inquiry-message"
-                className="text-sm font-medium text-foreground"
-              >
-                문의 내용
-              </label>
-              <textarea
-                id="inquiry-message"
-                name="inquiry-message"
-                rows={5}
-                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                placeholder="문의 내용을 입력하세요"
-              />
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <label
+                  htmlFor="inquiry-subject"
+                  className="text-sm font-medium text-foreground"
+                >
+                  제목 *
+                </label>
+                <input
+                  id="inquiry-subject"
+                  name="inquiry-subject"
+                  type="text"
+                  value={inquirySubject}
+                  onChange={(e) => setInquirySubject(e.target.value)}
+                  maxLength={200}
+                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  placeholder="문의 제목을 입력하세요 (최대 200자)"
+                  required
+                />
+                <p className="text-xs text-muted-foreground text-right">
+                  {inquirySubject.length} / 200
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <label
+                  htmlFor="inquiry-message"
+                  className="text-sm font-medium text-foreground"
+                >
+                  문의 내용 *
+                </label>
+                <textarea
+                  id="inquiry-message"
+                  name="inquiry-message"
+                  value={inquiryMessage}
+                  onChange={(e) => setInquiryMessage(e.target.value)}
+                  rows={5}
+                  maxLength={2000}
+                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  placeholder="문의 내용을 입력하세요 (최대 2000자)"
+                  required
+                />
+                <p className="text-xs text-muted-foreground text-right">
+                  {inquiryMessage.length} / 2000
+                </p>
+              </div>
             </div>
 
             <div className="mt-6 flex flex-col gap-3 sm:flex-row">
@@ -880,63 +1109,180 @@ const MyPage = () => {
         </div>
       )}
 
-      {isAssistantOpen && (
-        <div className="fixed bottom-6 right-6 z-40 w-[320px] sm:w-[360px]">
-          <div className="rounded-xl border border-border bg-card shadow-xl overflow-hidden">
-            <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-              <div className="flex items-center gap-2">
-                <Rocket className="w-4 h-4 text-yellow-600" />
-                <h4 className="text-sm font-semibold text-foreground">
-                  도우미
-                </h4>
+      {isChangePasswordOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+          <button
+            type="button"
+            className="absolute inset-0 bg-black/60"
+            aria-label="닫기"
+            onClick={closeChangePasswordModal}
+          />
+          <div className="relative w-full max-w-lg bg-card rounded-xl shadow-xl border border-border p-6">
+            <button
+              type="button"
+              className="absolute right-4 top-4 text-muted-foreground hover:text-foreground transition-colors"
+              onClick={closeChangePasswordModal}
+              aria-label="닫기"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="flex items-center gap-2 mb-2">
+              <Lock className="w-5 h-5 text-yellow-600" />
+              <h3 className="font-semibold text-foreground">비밀번호 변경</h3>
+            </div>
+            <p className="text-sm text-muted-foreground mb-6">
+              새로운 비밀번호를 입력해주세요. 이메일로 인증 코드가 전송됩니다.
+            </p>
+
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <label
+                  htmlFor="new-password"
+                  className="text-sm font-medium text-foreground"
+                >
+                  새 비밀번호
+                </label>
+                <input
+                  id="new-password"
+                  name="new-password"
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  placeholder="새 비밀번호를 입력하세요"
+                />
               </div>
+
+              <div className="space-y-2">
+                <label
+                  htmlFor="confirm-password"
+                  className="text-sm font-medium text-foreground"
+                >
+                  새 비밀번호 확인
+                </label>
+                <input
+                  id="confirm-password"
+                  name="confirm-password"
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  className={`w-full rounded-lg border px-3 py-2 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                    confirmPassword && newPassword !== confirmPassword
+                      ? "border-red-500 bg-red-50/10"
+                      : "border-border bg-background"
+                  }`}
+                  placeholder="새 비밀번호를 다시 입력하세요"
+                />
+                {confirmPassword && newPassword !== confirmPassword && (
+                  <p className="text-xs text-red-500">
+                    비밀번호가 일치하지 않습니다.
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div className="mt-6 flex flex-col gap-3 sm:flex-row">
               <button
                 type="button"
-                onClick={toggleAssistant}
-                className="text-muted-foreground hover:text-foreground transition-colors"
-                aria-label="닫기"
+                className="flex-1 rounded-lg border border-border px-4 py-2 text-sm font-semibold text-foreground transition-colors hover:bg-secondary/40"
+                onClick={closeChangePasswordModal}
+                disabled={isLoading}
               >
-                <X className="w-4 h-4" />
+                취소
               </button>
-            </div>
-
-            <div
-              ref={assistantScrollRef}
-              className="max-h-72 overflow-y-auto px-4 py-3 space-y-3"
-            >
-              {assistantMessages.map((message) => (
-                <div
-                  key={message.id}
-                  className={cn(
-                    "rounded-lg px-3 py-2 text-sm",
-                    message.role === "user"
-                      ? "bg-yellow-700/10 text-foreground ml-auto"
-                      : "bg-secondary/40 text-muted-foreground"
-                  )}
-                >
-                  {message.text}
-                </div>
-              ))}
-            </div>
-
-            <form
-              className="border-t border-border px-3 py-3 flex items-center gap-2"
-              onSubmit={handleAssistantSend}
-            >
-              <input
-                type="text"
-                className="flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                placeholder="궁금한 내용을 입력하세요"
-                value={assistantInput}
-                onChange={(event) => setAssistantInput(event.target.value)}
-              />
               <button
-                type="submit"
-                className="rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
+                type="button"
+                className="flex-1 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                onClick={handleChangePasswordSubmit}
+                disabled={!newPassword || !confirmPassword || newPassword !== confirmPassword || isLoading}
               >
-                전송
+                {isLoading && <Loader2 className="w-4 h-4 animate-spin" />}
+                변경
               </button>
-            </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isVerifyCodeOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+          <button
+            type="button"
+            className="absolute inset-0 bg-black/60"
+            aria-label="닫기"
+            onClick={closeVerifyCodeModal}
+          />
+          <div className="relative w-full max-w-lg bg-card rounded-xl shadow-xl border border-border p-6">
+            <button
+              type="button"
+              className="absolute right-4 top-4 text-muted-foreground hover:text-foreground transition-colors"
+              onClick={closeVerifyCodeModal}
+              aria-label="닫기"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <h3 className="font-semibold text-foreground mb-2">인증 코드 입력</h3>
+            <p className="text-sm text-muted-foreground mb-6">
+              이메일로 전송된 6자리 인증 코드를 입력해주세요.
+            </p>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">
+                  인증 코드
+                </label>
+                <input
+                  type="text"
+                  className="w-full rounded-lg border border-border bg-background px-4 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                  placeholder="6자리 코드 입력"
+                  value={verificationCode}
+                  onChange={(e) => setVerificationCode(e.target.value)}
+                  maxLength={6}
+                />
+              </div>
+            </div>
+            <div className="mt-6 flex gap-3">
+              <button
+                type="button"
+                className="flex-1 rounded-lg border border-border px-4 py-2 text-sm font-semibold text-foreground transition-colors hover:bg-secondary/40"
+                onClick={closeVerifyCodeModal}
+                disabled={isLoading}
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                className="flex-1 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                onClick={handleVerifyCodeSubmit}
+                disabled={!verificationCode.trim() || isLoading}
+              >
+                {isLoading && <Loader2 className="w-4 h-4 animate-spin" />}
+                확인
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isChangePasswordCompleteOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+          <button
+            type="button"
+            className="absolute inset-0 bg-black/60"
+            aria-label="닫기"
+            onClick={closeChangePasswordComplete}
+          />
+          <div className="relative w-full max-w-sm bg-card rounded-xl shadow-xl border border-border p-6 text-center">
+            <p className="text-sm text-foreground">
+              비밀번호 변경이 완료되었습니다.
+            </p>
+            <button
+              type="button"
+              className="mt-5 w-full rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
+              onClick={closeChangePasswordComplete}
+            >
+              확인
+            </button>
           </div>
         </div>
       )}

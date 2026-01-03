@@ -1,7 +1,9 @@
 import { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { BookOpen, History, Library, User, Settings, LogOut, X, Home, BookMarked } from "lucide-react"; // LogIn -> LogOut 변경
+import { BookOpen, History, Library, User, Settings, LogOut, X, Home, BookMarked } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/hooks/useAuth";
+import { toast } from "@/hooks/use-toast";
 
 // 1. 메뉴 데이터
 interface MenuItem {
@@ -37,6 +39,7 @@ interface LibrarySidebarProps {
 export function LibrarySidebar({ isOpen, onClose, onToggle }: LibrarySidebarProps) {
   const navigate = useNavigate();
   const location = useLocation();
+  const { logout } = useAuth();
   const [hoveredItem, setHoveredItem] = useState<string | null>(null);
   
   // 로그아웃 모달 상태 관리
@@ -54,10 +57,23 @@ export function LibrarySidebar({ isOpen, onClose, onToggle }: LibrarySidebarProp
     onClose();
   };
 
-  const handleLogoutConfirm = () => {
-    navigate("/auth"); // 실제 로그아웃 로직이 있다면 여기서 처리
-    setIsLogoutModalOpen(false);
-    onClose();
+  const handleLogoutConfirm = async () => {
+    try {
+      await logout();
+      toast({
+        title: "로그아웃 완료",
+        description: "안전하게 로그아웃되었습니다.",
+      });
+      setIsLogoutModalOpen(false);
+      onClose();
+      navigate("/", { replace: true }); // 메인 페이지로 이동 (인트로 화면)
+    } catch (error) {
+      toast({
+        title: "로그아웃 실패",
+        description: "로그아웃 중 오류가 발생했습니다.",
+        variant: "destructive",
+      });
+    }
   };
 
   // 메뉴 렌더링 함수

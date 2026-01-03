@@ -8,6 +8,8 @@ import { AddItemModal } from "@/components/library/AddItemModal";
 import { useLibraryContext } from "@/contexts/LibraryContext";
 import { LibraryItem, LibraryItemType, LibraryItemVisibility, LibraryTypeConfig } from "@/types/library";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { useAuth } from "@/hooks/useAuth";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
 
 const libraryTypeConfigs: LibraryTypeConfig[] = [
   {
@@ -43,11 +45,21 @@ const libraryTypeConfigs: LibraryTypeConfig[] = [
 const LibraryDetailPage = () => {
   const { type } = useParams<{ type: string }>();
   const navigate = useNavigate();
+  const { isAuthenticated, isLoading: authLoading, isCognitoConfigured } = useAuth();
+  const { displayName, isLoading: userLoading } = useCurrentUser();
   const { getItemsByType, deleteItems, addItem, updateItemsVisibility } = useLibraryContext();
   const menuRef = useRef<HTMLDivElement | null>(null);
 
   const itemType = type as LibraryItemType;
   const config = libraryTypeConfigs.find((item) => item.type === itemType);
+
+  // 인증 확인 및 리다이렉트
+  useEffect(() => {
+    if (!authLoading && !isAuthenticated) {
+      navigate('/auth', { replace: true });
+      return;
+    }
+  }, [isAuthenticated, authLoading, navigate]);
 
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -78,6 +90,25 @@ const LibraryDetailPage = () => {
 
   if (!config) {
     navigate("/library");
+    return null;
+  }
+
+  // 로딩 상태 처리
+  if (authLoading || userLoading) {
+    return (
+      <MainLayout>
+        <div className="min-h-screen flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gold mx-auto mb-4"></div>
+            <p className="font-serif text-muted-foreground">{config.label}을 불러오는 중...</p>
+          </div>
+        </div>
+      </MainLayout>
+    );
+  }
+
+  // 인증되지 않은 경우 (리다이렉트 전까지의 fallback)
+  if (!isAuthenticated) {
     return null;
   }
 
@@ -204,7 +235,10 @@ const LibraryDetailPage = () => {
               </button>
               <div>
                 <h1 className="font-serif text-2xl text-primary gold-accent">{config.label}</h1>
-                <p className="font-handwriting text-base text-muted-foreground">{items.length}개 항목</p>
+                <p className="font-handwriting text-base text-muted-foreground">
+                  {displayName}님의 {items.length}개 항목
+                  {!isCognitoConfigured && <span className="text-yellow-600 ml-2">(데모 모드)</span>}
+                </p>
               </div>
             </div>
 

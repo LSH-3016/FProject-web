@@ -8,6 +8,8 @@ import { useLibraryContext } from "@/contexts/LibraryContext";
 import { LibraryItemType, LibraryItemVisibility, LibraryTypeConfig } from "@/types/library";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AddItemModal } from "@/components/library/AddItemModal";
+import { useAuth } from "@/hooks/useAuth";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
 
 const libraryTypeConfigs: LibraryTypeConfig[] = [
   {
@@ -69,7 +71,36 @@ const LibraryPage = () => {
   });
   const uploadMenuRef = useRef<HTMLDivElement | null>(null);
   const navigate = useNavigate();
+  const { isAuthenticated, isLoading: authLoading, isCognitoConfigured } = useAuth();
+  const { displayName, userId, isLoading: userLoading } = useCurrentUser();
   const { getLatestItemByType, getItemCountByType, getItemsByType, addItem, items, loading, error } = useLibraryContext();
+
+  // 인증 확인 및 리다이렉트
+  useEffect(() => {
+    if (!authLoading && !isAuthenticated) {
+      navigate('/auth', { replace: true });
+      return;
+    }
+  }, [isAuthenticated, authLoading, navigate]);
+
+  // 로딩 상태 처리
+  if (authLoading || userLoading) {
+    return (
+      <MainLayout>
+        <div className="min-h-screen flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gold mx-auto mb-4"></div>
+            <p className="font-serif text-muted-foreground">라이브러리를 불러오는 중...</p>
+          </div>
+        </div>
+      </MainLayout>
+    );
+  }
+
+  // 인증되지 않은 경우 (리다이렉트 전까지의 fallback)
+  if (!isAuthenticated) {
+    return null;
+  }
 
   const formatDate = (value?: string | Date) => {
     if (!value) {
@@ -195,8 +226,15 @@ const LibraryPage = () => {
               라이브러리
             </h1>
             <p className="font-handwriting text-xl text-muted-foreground">
-              사진, 영상, 문서를 보관하세요
+              {displayName}님의 사진, 영상, 문서를 보관하세요
             </p>
+            {!isCognitoConfigured && (
+              <div className="mt-4 p-3 bg-yellow-50/50 border border-yellow-200/50 rounded-md">
+                <p className="text-xs text-yellow-800">
+                  💡 Cognito 설정이 완료되면 실제 사용자별 데이터가 표시됩니다.
+                </p>
+              </div>
+            )}
           </header>
 
           {/* API 연동 실패 에러 메시지 */}

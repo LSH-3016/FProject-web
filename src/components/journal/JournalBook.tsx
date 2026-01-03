@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { Sparkles, Feather, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AddItemModal } from "@/components/library/AddItemModal";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
 
 // 커스텀 훅들
 import { useJournalEntries } from "./hooks/useJournalEntries";
@@ -21,6 +22,7 @@ import { SummaryDialog } from "./dialogs/SummaryDialog";
 import { OverwriteDialog, SavingDialog, SuccessDialog } from "./dialogs/HistoryDialogs";
 
 export const JournalBook = () => {
+  const { userId, displayName, name, nickname, isLoading: authLoading, isReady } = useCurrentUser();
   const entriesContainerRef = useRef<HTMLDivElement>(null);
   
   // 삭제 관련 상태
@@ -36,9 +38,40 @@ export const JournalBook = () => {
   const [errorMessage, setErrorMessage] = useState<string>("");
 
   // API 관련 상태
-  const currentUserId = "user_001"; // 실제로는 인증된 사용자 ID를 사용
+  const currentUserId = userId; // useCurrentUser 훅에서 가져온 userId 사용
+  const finalDisplayName = name || nickname || displayName; // 사용자 이름 우선순위
   const API_BASE_URL = import.meta.env.VITE_JOURNAL_API_URL || "http://localhost:8000";
   const LIBRARY_API_URL = import.meta.env.VITE_LIBRARY_API_URL || "http://192.168.0.138:8000/api/v1";
+
+  // 인증되지 않은 경우 또는 사용자 ID가 없는 경우 처리
+  if (authLoading) {
+    return (
+      <div className="w-full max-w-7xl mx-auto space-y-6 p-4">
+        <div className="library-card p-6 md:p-8 animate-slide-up border rounded-xl bg-card flex items-center justify-center min-h-[400px]">
+          <div className="flex flex-col items-center gap-4">
+            <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            <p className="text-muted-foreground">사용자 정보를 확인하는 중...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isReady) {
+    return (
+      <div className="w-full max-w-7xl mx-auto space-y-6 p-4">
+        <div className="library-card p-6 md:p-8 animate-slide-up border rounded-xl bg-card flex items-center justify-center min-h-[400px]">
+          <div className="flex flex-col items-center gap-4">
+            <Feather className="w-12 h-12 text-muted-foreground" />
+            <div className="text-center">
+              <h3 className="font-display text-lg font-semibold text-foreground mb-2">로그인이 필요합니다</h3>
+              <p className="text-muted-foreground">일기를 작성하려면 먼저 로그인해주세요.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // 커스텀 훅 사용
   const {
@@ -190,8 +223,12 @@ export const JournalBook = () => {
             <Feather className="w-5 h-5 text-primary" />
           </div>
           <div>
-            <h2 className="font-display text-xl font-semibold text-foreground">오늘의 추억 기록</h2>
-            <p className="text-sm text-muted-foreground">오늘은 어떤 일이 있었나요?</p>
+            <h2 className="font-display text-xl font-semibold text-foreground">
+              {finalDisplayName}님의 추억 기록
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              오늘은 어떤 일이 있었나요?
+            </p>
           </div>
         </div>
 

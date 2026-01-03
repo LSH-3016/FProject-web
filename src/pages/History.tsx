@@ -5,6 +5,9 @@ import { historyDB, clearLocalDB } from '@/services/historyDB';
 import { HistoryEventUI, AppState, KOREAN_UI_TEXTS } from '@/types/history';
 import { Search, Sparkles, Trash2, Tag, X } from 'lucide-react';
 import ErrorBoundary from '@/components/history/ErrorBoundary';
+import { useAuth } from "@/hooks/useAuth";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { useNavigate } from "react-router-dom";
 
 const History = () => {
   const [query, setQuery] = useState('');
@@ -19,23 +22,41 @@ const History = () => {
   const [searchResults, setSearchResults] = useState<HistoryEventUI[]>([]);
   const [showSidebar, setShowSidebar] = useState(false);
   const [recentViewed, setRecentViewed] = useState<string[]>([]); // 최근 본 기록 (날짜 형식)
+  
+  const navigate = useNavigate();
+  const { isAuthenticated, isLoading: authLoading, isCognitoConfigured } = useAuth();
+  const { displayName, userId, isLoading: userLoading } = useCurrentUser();
+
+  // 인증 확인 및 리다이렉트
+  useEffect(() => {
+    if (!authLoading && !isAuthenticated) {
+      navigate('/auth', { replace: true });
+      return;
+    }
+  }, [isAuthenticated, authLoading, navigate]);
 
   // 컴포넌트 마운트 시 로컬 DB 정리 및 PostgreSQL에서 기록 로드
   useEffect(() => {
+    // 인증되지 않은 경우 초기화하지 않음
+    if (!isAuthenticated || authLoading || userLoading) {
+      return;
+    }
+
     const initializeApp = async () => {
-      // 사용자 ID 설정 (Journal과 동일하게)
-      const userId = 'user_001'; // 실제로는 인증된 사용자 ID 사용
+      // 실제 사용자 ID 사용 (Cognito에서 가져온 사용자 정보)
+      console.log('🔐 History 초기화 - 사용자 ID:', userId);
+      
       localStorage.setItem('currentUserId', userId);
 
-      // 로컬 IndexedDB 정리 (한 번만 실행)
-      const hasCleanedLocal = localStorage.getItem('hasCleanedLocalDB');
+      // 로컬 IndexedDB 정리 (사용자별로 한 번만 실행)
+      const hasCleanedLocal = localStorage.getItem(`hasCleanedLocalDB_${userId}`);
       if (!hasCleanedLocal) {
         await clearLocalDB();
-        localStorage.setItem('hasCleanedLocalDB', 'true');
+        localStorage.setItem(`hasCleanedLocalDB_${userId}`, 'true');
       }
 
-      // 최근 본 기록 불러오기
-      const savedRecent = localStorage.getItem('recentViewed');
+      // 최근 본 기록 불러오기 (사용자별)
+      const savedRecent = localStorage.getItem(`recentViewed_${userId}`);
       if (savedRecent) {
         setRecentViewed(JSON.parse(savedRecent));
       }
@@ -45,7 +66,7 @@ const History = () => {
     };
 
     initializeApp();
-  }, []);
+  }, [isAuthenticated, authLoading, userLoading, userId]);
 
   // 태그 필터링 - DB API 사용
   useEffect(() => {
@@ -146,11 +167,11 @@ const History = () => {
       setDuplicateWarning('');
       setFlipTrigger((prev: number) => prev + 1);
 
-      // 최근 본 기록에 추가 (날짜 기준, 중복 제거, 최대 5개)
+      // 최근 본 기록에 추가 (사용자별로 저장)
       const newDates = selectedEvents.map(e => e.record_date);
       const updatedRecent = [...new Set([...newDates, ...recentViewed])].slice(0, 5);
       setRecentViewed(updatedRecent);
-      localStorage.setItem('recentViewed', JSON.stringify(updatedRecent));
+      localStorage.setItem(`recentViewed_${userId}`, JSON.stringify(updatedRecent));
 
     } catch (error) {
       console.error("Display failed:", error);
@@ -182,6 +203,25 @@ const History = () => {
     backgroundRepeat: 'no-repeat' as const,
     backgroundAttachment: 'fixed' as const
   }), []);
+
+  // 로딩 상태 처리
+  if (authLoading || userLoading) {
+    return (
+      <MainLayout>
+        <div className="min-h-screen flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-700 mx-auto mb-4"></div>
+            <p className="font-serif text-amber-800">기억의 서를 불러오는 중...</p>
+          </div>
+        </div>
+      </MainLayout>
+    );
+  }
+
+  // 인증되지 않은 경우 (리다이렉트 전까지의 fallback)
+  if (!isAuthenticated) {
+    return null;
+  }
 
   return (
     <MainLayout>
@@ -293,7 +333,7 @@ const History = () => {
               type="text"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder={KOREAN_UI_TEXTS.searchPlaceholder}
+              placeholder={`${displayName}님의 ${KOREAN_UI_TEXTS.searchPlaceholder}`}
               disabled={appState === AppState.LOADING}
               className="w-full px-6 py-4 pr-14 text-lg rounded-full border-4 border-amber-700 bg-amber-50/95 text-amber-900 placeholder-amber-700 focus:outline-none focus:ring-4 focus:ring-amber-500 disabled:opacity-50 shadow-2xl backdrop-blur-sm font-serif"
             />
@@ -311,6 +351,15 @@ const History = () => {
             </button>
           </div>
         </form>
+
+        {/* Cognito 설정 안내 */}
+        {!isCognitoConfigured && (
+          <div className="w-full px-2">
+            <div className="bg-amber-900/20 border border-amber-700/50 text-amber-200 px-4 py-2 rounded-lg text-sm font-serif">
+              💡 Cognito 설정이 완료되면 실제 사용자별 기록이 표시됩니다.
+            </div>
+          </div>
+        )}
 
         {/* 최근 본 기록 (날짜 태그) */}
         {recentViewed && recentViewed.length > 0 && (

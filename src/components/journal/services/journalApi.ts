@@ -17,7 +17,6 @@ export class JournalApiService {
   // 사용자 메시지 로드
   async loadUserEntries(userId: string, limit: number = 100, offset: number = 0): Promise<JournalEntry[]> {
     const apiUrl = `${this.apiBaseUrl}/messages?user_id=${userId}&limit=${limit}&offset=${offset}`;
-    console.log('API 호출 시도:', apiUrl);
     
     const response = await fetch(apiUrl);
     
@@ -26,7 +25,6 @@ export class JournalApiService {
     }
     
     const messages = await response.json();
-    console.log('API 응답 성공:', messages.length, '개의 메시지');
     
     // API 응답의 created_at을 Date 객체로 변환
     return messages.map((msg: any) => ({

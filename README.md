@@ -4,6 +4,66 @@
 
 **URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
 
+## AWS Cognito Authentication Setup
+
+This project uses AWS Cognito for user authentication. To set up authentication:
+
+### 1. Environment Variables
+
+Copy `.env.example` to `.env` and configure the following variables:
+
+```env
+# AWS Cognito Configuration
+VITE_COGNITO_REGION=ap-northeast-2
+VITE_COGNITO_USER_POOL_ID=your_user_pool_id
+VITE_COGNITO_CLIENT_ID=your_client_id
+VITE_COGNITO_DOMAIN=your_cognito_domain
+
+# OAuth Configuration
+VITE_OAUTH_REDIRECT_URI=http://localhost:5173/auth/callback
+
+# AWS Configuration (for server-side operations)
+VITE_AWS_REGION=ap-northeast-2
+VITE_AWS_USER_POOL_ID=your_user_pool_id
+VITE_AWS_USER_POOL_WEB_CLIENT_ID=your_client_id
+```
+
+### 2. Cognito Configuration
+
+The project includes a `cognito-config.json` file with the current Cognito User Pool configuration. This file contains:
+
+- User Pool settings and policies
+- Password requirements (8+ characters, uppercase, lowercase, numbers, special characters)
+- User attributes schema
+- Email verification settings
+
+### 3. Authentication Features
+
+The authentication system includes:
+
+- **User Registration**: Email-based signup with email verification
+- **Login/Logout**: Secure authentication with JWT tokens
+- **Password Reset**: Forgot password functionality with email verification
+- **Google OAuth**: Social login integration (requires additional setup)
+- **Session Management**: Automatic token refresh and session persistence
+
+### 4. Authentication Components
+
+- `LoginForm`: User login interface
+- `SignUpForm`: User registration with password strength validation
+- `EmailConfirmationForm`: Email verification after signup
+- `ForgotPasswordForm`: Password reset request
+- `ConfirmPasswordResetForm`: Password reset confirmation
+
+### 5. Usage
+
+The authentication is integrated into the existing Auth page (`/auth`) with a beautiful book-style interface. Users can:
+
+1. Sign up with email, name, and nickname
+2. Verify their email address
+3. Log in to access the application
+4. Reset their password if forgotten
+
 ## How can I edit this code?
 
 There are several ways of editing your application.

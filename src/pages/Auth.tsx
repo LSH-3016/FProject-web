@@ -4,20 +4,26 @@ import { MainLayout } from "@/components/layout/MainLayout";
 import { BookOpen, Feather, Mail, Lock, User, ArrowRight, KeyRound, Loader2, HelpCircle, RefreshCcw, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
+import { getAuthErrorMessage } from "@/lib/auth";
+import { LoginForm } from "@/components/auth/LoginForm";
 
-type AuthMode = "login" | "signup" | "verify" | "forgot";
+type AuthMode = "login" | "signup" | "verify" | "forgot" | "confirmReset";
 
 const Auth = () => {
   const navigate = useNavigate();
+  const { login, signUp, confirmSignUp, resendConfirmationCode, forgotPassword, confirmPassword, isLoading, isAuthenticated, isCognitoConfigured } = useAuth();
   const [mode, setMode] = useState<AuthMode>("login");
   const [isBookOpen, setIsBookOpen] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
   
   const [formData, setFormData] = useState({
     email: "",
     password: "",
+    confirmPassword: "",
     name: "",
+    nickname: "",
     code: "",
+    newPassword: "",
   });
 
   const [errors, setErrors] = useState<{[key: string]: string}>({});
@@ -26,6 +32,14 @@ const Auth = () => {
     const timer = setTimeout(() => setIsBookOpen(true), 300);
     return () => clearTimeout(timer);
   }, []);
+
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (isAuthenticated) {
+      // 로그인 완료 후 일기 페이지로 이동
+      navigate("/journal", { replace: true });
+    }
+  }, [isAuthenticated, navigate]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -39,11 +53,19 @@ const Auth = () => {
   const validateForm = () => {
     const newErrors: {[key: string]: string} = {};
     
-    if (mode === "signup" && !formData.name.trim()) {
-      newErrors.name = "이름을 입력해주세요.";
+    if (mode === "signup") {
+      if (!formData.name.trim()) {
+        newErrors.name = "이름을 입력해주세요.";
+      }
+      if (!formData.nickname.trim()) {
+        newErrors.nickname = "닉네임을 입력해주세요.";
+      }
+      if (formData.password !== formData.confirmPassword) {
+        newErrors.confirmPassword = "비밀번호가 일치하지 않습니다.";
+      }
     }
 
-    if (mode !== "verify" && !formData.email.trim()) {
+    if (mode !== "verify" && mode !== "confirmReset" && !formData.email.trim()) {
       newErrors.email = "이메일 주소를 입력해주세요.";
     }
 
@@ -51,8 +73,12 @@ const Auth = () => {
       newErrors.password = "비밀번호를 입력해주세요.";
     }
 
-    if (mode === "verify" && !formData.code.trim()) {
+    if ((mode === "verify" || mode === "confirmReset") && !formData.code.trim()) {
       newErrors.code = "6자리 코드를 입력해주세요.";
+    }
+
+    if (mode === "confirmReset" && !formData.newPassword) {
+      newErrors.newPassword = "새 비밀번호를 입력해주세요.";
     }
 
     setErrors(newErrors);
@@ -66,30 +92,60 @@ const Auth = () => {
       return; 
     }
 
-    setIsLoading(true);
-
-    await new Promise((resolve) => setTimeout(resolve, 1200));
-
-    switch (mode) {
-      case "login":
-        toast({ title: "로그인 성공", description: "기록실로 이동합니다." });
-        setTimeout(() => navigate("/"), 500);
-        break;
-      case "signup":
-        toast({ title: "인증 메일 발송", description: "이메일로 전송된 코드를 입력해주세요." });
-        setMode("verify");
-        break;
-      case "verify":
-        toast({ title: "인증 완료", description: "환영합니다! 이제 로그인해주세요." });
-        setMode("login");
-        break;
-      case "forgot":
-        toast({ title: "코드 발송", description: "비밀번호 재설정 코드를 보냈습니다." });
-        setMode("verify");
-        break;
+    try {
+      switch (mode) {
+        case "login":
+          await login(formData.email, formData.password);
+          toast({ title: "환영합니다!", description: "기억의 도서관으로 이동합니다." });
+          // 로그인 성공 시 일기 페이지로 이동 (useEffect에서 처리됨)
+          break;
+          
+        case "signup":
+          await signUp(formData.email, formData.password, formData.name, formData.nickname);
+          toast({ title: "인증 메일 발송", description: "이메일로 전송된 코드를 입력해주세요." });
+          setMode("verify");
+          break;
+          
+        case "verify":
+          await confirmSignUp(formData.email, formData.code);
+          toast({ title: "인증 완료", description: "환영합니다! 이제 로그인해주세요." });
+          setMode("login");
+          break;
+          
+        case "forgot":
+          await forgotPassword(formData.email);
+          toast({ title: "코드 발송", description: "비밀번호 재설정 코드를 보냈습니다." });
+          setMode("confirmReset");
+          break;
+          
+        case "confirmReset":
+          await confirmPassword(formData.email, formData.code, formData.newPassword);
+          toast({ title: "비밀번호 재설정 완료", description: "새 비밀번호로 로그인해주세요." });
+          setMode("login");
+          break;
+      }
+    } catch (error: any) {
+      const errorMessage = getAuthErrorMessage(error);
+      toast({ 
+        title: "오류", 
+        description: errorMessage,
+        variant: "destructive"
+      });
     }
+  };
 
-    setIsLoading(false);
+  const handleResendCode = async () => {
+    try {
+      await resendConfirmationCode(formData.email);
+      toast({ title: "코드 재전송", description: "인증 코드를 재전송했습니다." });
+    } catch (error: any) {
+      const errorMessage = getAuthErrorMessage(error);
+      toast({ 
+        title: "오류", 
+        description: errorMessage,
+        variant: "destructive"
+      });
+    }
   };
 
   const renderInput = (
@@ -199,38 +255,50 @@ const Auth = () => {
                       {mode === "signup" && "도서관 회원 등록"}
                       {mode === "verify" && "본인 확인"}
                       {mode === "forgot" && "비밀번호 찾기"}
+                      {mode === "confirmReset" && "새 비밀번호 설정"}
                     </h1>
                     <p className="font-handwriting text-ink/60 text-sm">
                       {mode === "verify" && "이메일로 전송된 6자리 코드를 입력하세요"}
+                      {mode === "confirmReset" && "인증 코드와 새 비밀번호를 입력하세요"}
                     </p>
                   </div>
                 </div>
 
-                {/* 폼 */}
-                <form 
-                  key={mode} 
-                  onSubmit={handleSubmit}
-                  noValidate
-                  className="space-y-5 flex-1 animate-in fade-in slide-in-from-bottom-4 duration-500 fill-mode-forwards"
-                >
-                  {mode === "signup" && renderInput(User, "name", "text", "홍길동", "이름 (닉네임)")}
-                  {mode !== "verify" && renderInput(Mail, "email", "email", "example@email.com", "이메일")}
+                {/* 로그인 모드일 때는 LoginForm 컴포넌트 사용 */}
+                {mode === "login" ? (
+                  <div className="flex-1">
+                    <LoginForm
+                      onSuccess={() => {
+                        toast({ title: "환영합니다!", description: "기억의 도서관으로 이동합니다." });
+                      }}
+                      onSignUpClick={() => setMode("signup")}
+                      onForgotPasswordClick={() => setMode("forgot")}
+                    />
+                  </div>
+                ) : (
+                  <>
+                    {/* 기존 폼 (회원가입, 인증 등) */}
+                    <form 
+                      key={mode} 
+                      onSubmit={handleSubmit}
+                      noValidate
+                      className="space-y-5 flex-1 animate-in fade-in slide-in-from-bottom-4 duration-500 fill-mode-forwards"
+                    >
+                  {mode === "signup" && (
+                    <>
+                      {renderInput(User, "name", "text", "홍길동", "이름")}
+                      {renderInput(User, "nickname", "text", "닉네임", "닉네임")}
+                    </>
+                  )}
+                  
+                  {mode !== "verify" && mode !== "confirmReset" && renderInput(Mail, "email", "email", "example@email.com", "이메일")}
 
-                  {(mode === "login" || mode === "signup") && (
+                  {mode === "signup" && (
                     <div className="space-y-1.5">
                        <div className="flex justify-between items-end">
                         <label className={cn("font-serif text-sm block ml-1 transition-colors", errors.password ? "text-red-800/80" : "text-ink/80")}>
                           비밀번호
                         </label>
-                        {mode === "login" && (
-                          <button 
-                            type="button"
-                            onClick={() => setMode("forgot")}
-                            className="text-xs font-handwriting text-ink/50 hover:text-gold transition-colors underline decoration-dotted"
-                          >
-                            비밀번호를 잊으셨나요?
-                          </button>
-                        )}
                        </div>
                        <div className="relative group">
                         <div className={cn(
@@ -262,38 +330,118 @@ const Auth = () => {
                         </div>
                        )}
                        
-                       {mode === "signup" && !errors.password && (
-                         <p className="text-[10px] text-ink/40 pl-1 font-sans">* 8자 이상, 특수문자 포함</p>
+                       {!errors.password && (
+                         <p className="text-[10px] text-ink/40 pl-1 font-sans">* 8자 이상, 대소문자, 숫자, 특수문자 포함</p>
                        )}
                     </div>
                   )}
 
-                  {mode === "verify" && (
+                  {mode === "signup" && (
+                    <div className="space-y-1.5">
+                       <label className={cn("font-serif text-sm block ml-1 transition-colors", errors.confirmPassword ? "text-red-800/80" : "text-ink/80")}>
+                         비밀번호 확인
+                       </label>
+                       <div className="relative group">
+                        <div className={cn(
+                            "absolute left-3 top-1/2 -translate-y-1/2 transition-colors duration-300",
+                            errors.confirmPassword ? "text-red-800/60" : "text-ink/40 group-focus-within:text-gold"
+                        )}>
+                          <Lock className="w-5 h-5" />
+                        </div>
+                        <input
+                          type="password"
+                          name="confirmPassword"
+                          value={formData.confirmPassword}
+                          onChange={handleInputChange}
+                          placeholder="••••••••"
+                          className={cn(
+                            "w-full pl-11 pr-4 py-3.5 rounded-md border transition-all duration-300",
+                            "font-handwriting text-lg text-ink placeholder:text-ink/30",
+                            "focus:outline-none focus:bg-aged-paper",
+                            errors.confirmPassword
+                                ? "bg-red-50/50 border-red-800/30 focus:border-red-800/50 focus:ring-1 focus:ring-red-800/20" 
+                                : "bg-aged-paper/60 border-ink/10 group-hover:border-ink/30 focus:border-gold/60 focus:ring-1 focus:ring-gold/30"
+                          )}
+                        />
+                       </div>
+                       {errors.confirmPassword && (
+                        <div className="flex items-center gap-1.5 mt-1 ml-1 animate-in slide-in-from-left-1 duration-300">
+                            <AlertCircle className="w-3 h-3 text-red-800/70" />
+                            <p className="font-handwriting text-sm text-red-800/80">{errors.confirmPassword}</p>
+                        </div>
+                       )}
+                    </div>
+                  )}
+
+                  {(mode === "verify" || mode === "confirmReset") && (
                     <div className="space-y-4">
                       {renderInput(KeyRound, "code", "text", "123456", "인증 코드")}
                       
-                      <div className="text-center">
-                        <button 
-                          type="button"
-                          className="inline-flex items-center gap-1.5 text-xs font-handwriting text-ink/50 hover:text-gold transition-colors"
-                          onClick={() => toast({ description: "인증 코드를 재전송했습니다." })}
-                        >
-                          <RefreshCcw className="w-3 h-3" />
-                          코드가 오지 않았나요? 재전송
-                        </button>
-                      </div>
+                      {mode === "verify" && (
+                        <div className="text-center">
+                          <button 
+                            type="button"
+                            className="inline-flex items-center gap-1.5 text-xs font-handwriting text-ink/50 hover:text-gold transition-colors"
+                            onClick={handleResendCode}
+                          >
+                            <RefreshCcw className="w-3 h-3" />
+                            코드가 오지 않았나요? 재전송
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {mode === "confirmReset" && (
+                    <div className="space-y-1.5">
+                       <label className={cn("font-serif text-sm block ml-1 transition-colors", errors.newPassword ? "text-red-800/80" : "text-ink/80")}>
+                         새 비밀번호
+                       </label>
+                       <div className="relative group">
+                        <div className={cn(
+                            "absolute left-3 top-1/2 -translate-y-1/2 transition-colors duration-300",
+                            errors.newPassword ? "text-red-800/60" : "text-ink/40 group-focus-within:text-gold"
+                        )}>
+                          <Lock className="w-5 h-5" />
+                        </div>
+                        <input
+                          type="password"
+                          name="newPassword"
+                          value={formData.newPassword}
+                          onChange={handleInputChange}
+                          placeholder="••••••••"
+                          className={cn(
+                            "w-full pl-11 pr-4 py-3.5 rounded-md border transition-all duration-300",
+                            "font-handwriting text-lg text-ink placeholder:text-ink/30",
+                            "focus:outline-none focus:bg-aged-paper",
+                            errors.newPassword
+                                ? "bg-red-50/50 border-red-800/30 focus:border-red-800/50 focus:ring-1 focus:ring-red-800/20" 
+                                : "bg-aged-paper/60 border-ink/10 group-hover:border-ink/30 focus:border-gold/60 focus:ring-1 focus:ring-gold/30"
+                          )}
+                        />
+                       </div>
+                       {errors.newPassword && (
+                        <div className="flex items-center gap-1.5 mt-1 ml-1 animate-in slide-in-from-left-1 duration-300">
+                            <AlertCircle className="w-3 h-3 text-red-800/70" />
+                            <p className="font-handwriting text-sm text-red-800/80">{errors.newPassword}</p>
+                        </div>
+                       )}
+                       
+                       {!errors.newPassword && (
+                         <p className="text-[10px] text-ink/40 pl-1 font-sans">* 8자 이상, 대소문자, 숫자, 특수문자 포함</p>
+                       )}
                     </div>
                   )}
 
                   <div className="pt-4">
-                    {/* 👇 [수정됨] vintage-btn 대신 직접 Tailwind 클래스로 색상 지정 */}
                     <button
                       type="submit"
-                      disabled={isLoading}
+                      disabled={isLoading || !isCognitoConfigured}
                       className={cn(
                         "w-full py-4 rounded-md flex items-center justify-center gap-3 font-serif transition-all duration-300 group disabled:opacity-70 disabled:cursor-not-allowed",
-                        // 배경색: 가죽색(bg-leather), 글자색: 세피아(text-sepia)
-                        "bg-[hsl(var(--leather))] text-[hsl(var(--sepia))] shadow-md hover:brightness-110 hover:shadow-lg"
+                        isCognitoConfigured 
+                          ? "bg-[hsl(var(--leather))] text-[hsl(var(--sepia))] shadow-md hover:brightness-110 hover:shadow-lg"
+                          : "bg-gray-400 text-gray-600"
                       )}
                     >
                       {isLoading ? (
@@ -301,10 +449,10 @@ const Auth = () => {
                       ) : (
                         <>
                           <span>
-                            {mode === "login" && "기록실 입장"}
                             {mode === "signup" && "회원 등록"}
                             {mode === "verify" && "인증 확인"}
                             {mode === "forgot" && "코드 전송"}
+                            {mode === "confirmReset" && "비밀번호 재설정"}
                           </span>
                           <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                         </>
@@ -313,22 +461,36 @@ const Auth = () => {
                   </div>
 
                 </form>
+                </>
+                )}
 
-                <div className="mt-8 text-center pt-6 border-t border-ink/5">
-                  <button
-                    onClick={() => {
-                      if (mode === "login") setMode("signup");
-                      else if (mode === "signup") setMode("login");
-                      else setMode("login");
-                      setErrors({});
-                    }}
-                    className="font-handwriting text-ink/60 hover:text-gold transition-colors text-sm"
-                  >
-                    {mode === "login" && "아직 회원이 아니신가요? 가입하기"}
-                    {mode === "signup" && "이미 계정이 있으신가요? 로그인"}
-                    {(mode === "verify" || mode === "forgot") && "로그인 화면으로 돌아가기"}
-                  </button>
-                </div>
+                {/* 하단 링크 - 로그인 모드가 아닐 때만 표시 */}
+                {mode !== "login" && (
+                  <div className="mt-8 text-center pt-6 border-t border-ink/5">
+                    <button
+                      onClick={() => {
+                        if (mode === "signup") setMode("login");
+                        else if (mode === "forgot") setMode("login");
+                        else if (mode === "confirmReset") setMode("login");
+                        else setMode("login");
+                        setErrors({});
+                      }}
+                      className="font-handwriting text-ink/60 hover:text-gold transition-colors text-sm"
+                    >
+                      {mode === "signup" && "이미 계정이 있으신가요? 로그인"}
+                      {(mode === "verify" || mode === "forgot" || mode === "confirmReset") && "로그인 화면으로 돌아가기"}
+                    </button>
+                    
+                    {/* API 연동 오류 안내 */}
+                    {!isCognitoConfigured && (
+                      <div className="mt-4 p-3 bg-red-50/50 border border-red-200/50 rounded-md">
+                        <p className="text-xs text-red-800">
+                          ⚠️ API 연동 오류: Cognito 설정을 확인해주세요.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
 
               </div>
             </div>
