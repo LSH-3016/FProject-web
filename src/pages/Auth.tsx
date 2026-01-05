@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { MainLayout } from "@/components/layout/MainLayout";
-import { BookOpen, Feather, Mail, Lock, User, ArrowRight, KeyRound, Loader2, HelpCircle, RefreshCcw, AlertCircle } from "lucide-react";
+import { BookOpen, Feather, Mail, Lock, User, ArrowRight, KeyRound, Loader2, HelpCircle, RefreshCcw, AlertCircle, Eye, EyeOff, Check, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
@@ -13,8 +13,36 @@ type AuthMode = "login" | "signup" | "verify" | "forgot" | "confirmReset";
 const Auth = () => {
   const navigate = useNavigate();
   const { login, signUp, confirmSignUp, resendConfirmationCode, forgotPassword, confirmPassword, isLoading, isAuthenticated, isCognitoConfigured } = useAuth();
-  const [mode, setMode] = useState<AuthMode>("login");
+  
+  // sessionStorage에서 mode 복원 (컴포넌트 리마운트 시 유지)
+  const getInitialMode = (): AuthMode => {
+    const savedMode = sessionStorage.getItem('authMode');
+    if (savedMode && ['login', 'signup', 'verify', 'forgot', 'confirmReset'].includes(savedMode)) {
+      console.log('📦 sessionStorage에서 mode 복원:', savedMode);
+      return savedMode as AuthMode;
+    }
+    return 'login';
+  };
+  
+  const [mode, setModeState] = useState<AuthMode>(getInitialMode);
   const [isBookOpen, setIsBookOpen] = useState(false);
+  
+  // mode 변경 시 sessionStorage에 저장
+  const setMode = (newMode: AuthMode) => {
+    console.log('📝 mode 변경:', mode, '->', newMode);
+    sessionStorage.setItem('authMode', newMode);
+    setModeState(newMode);
+  };
+  
+  // 로그인 성공 시 sessionStorage 정리
+  useEffect(() => {
+    if (isAuthenticated) {
+      sessionStorage.removeItem('authMode');
+      sessionStorage.removeItem('pendingEmail');
+    }
+  }, [isAuthenticated]);
+  
+  console.log('🏗️ Auth 컴포넌트 렌더링 - mode:', mode);
   
   const [formData, setFormData] = useState({
     email: "",
@@ -27,19 +55,43 @@ const Auth = () => {
   });
 
   const [errors, setErrors] = useState<{[key: string]: string}>({});
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  
+  // pendingEmail도 sessionStorage에서 복원
+  const [pendingEmail, setPendingEmailState] = useState<string>(() => {
+    return sessionStorage.getItem('pendingEmail') || '';
+  });
+  
+  const setPendingEmail = (email: string) => {
+    if (email) {
+      sessionStorage.setItem('pendingEmail', email);
+    } else {
+      sessionStorage.removeItem('pendingEmail');
+    }
+    setPendingEmailState(email);
+  };
+
+  // mode 변경 감지
+  useEffect(() => {
+    console.log('🔄 mode 변경됨:', mode);
+  }, [mode]);
 
   useEffect(() => {
     const timer = setTimeout(() => setIsBookOpen(true), 300);
     return () => clearTimeout(timer);
   }, []);
 
-  // Redirect if already authenticated
+  // Redirect if already authenticated (but not during signup verification)
   useEffect(() => {
-    if (isAuthenticated) {
+    console.log('🔍 useEffect 실행 - isAuthenticated:', isAuthenticated, 'mode:', mode);
+    if (isAuthenticated && mode !== "verify") {
+      console.log('🚀 /journal로 리다이렉트');
       // 로그인 완료 후 일기 페이지로 이동
       navigate("/journal", { replace: true });
     }
-  }, [isAuthenticated, navigate]);
+  }, [isAuthenticated, navigate, mode]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -60,7 +112,14 @@ const Auth = () => {
       if (!formData.nickname.trim()) {
         newErrors.nickname = "닉네임을 입력해주세요.";
       }
-      if (formData.password !== formData.confirmPassword) {
+      if (!formData.password) {
+        newErrors.password = "비밀번호를 입력해주세요.";
+      } else if (formData.password.length < 8) {
+        newErrors.password = "비밀번호는 8자 이상이어야 합니다.";
+      }
+      if (!formData.confirmPassword) {
+        newErrors.confirmPassword = "비밀번호 확인을 입력해주세요.";
+      } else if (formData.password !== formData.confirmPassword) {
         newErrors.confirmPassword = "비밀번호가 일치하지 않습니다.";
       }
     }
@@ -69,7 +128,7 @@ const Auth = () => {
       newErrors.email = "이메일 주소를 입력해주세요.";
     }
 
-    if ((mode === "login" || mode === "signup") && !formData.password) {
+    if (mode === "login" && !formData.password) {
       newErrors.password = "비밀번호를 입력해주세요.";
     }
 
@@ -101,27 +160,66 @@ const Auth = () => {
           break;
           
         case "signup":
-          await signUp(formData.email, formData.password, formData.name, formData.nickname);
-          toast({ title: "인증 메일 발송", description: "이메일로 전송된 코드를 입력해주세요." });
-          setMode("verify");
+          try {
+            console.log('🔵 회원가입 시작:', formData.email);
+            await signUp(formData.email, formData.password, formData.name, formData.nickname);
+            console.log('✅ signUp 함수 완료');
+            setPendingEmail(formData.email); // 이메일 저장
+            console.log('✅ pendingEmail 설정:', formData.email);
+            
+            toast({ 
+              title: "회원가입 완료", 
+              description: "AWS 관리자에게 계정 승인을 요청하세요. 또는 AWS Console에서 수동으로 확인해주세요."
+            });
+            
+            console.log('✅ verify 모드로 전환 시도');
+            setMode("verify");
+            console.log('✅ verify 모드로 전환 완료');
+          } catch (signUpError: any) {
+            console.error('🔴 회원가입 에러 발생:', signUpError);
+            console.error('🔴 에러 코드:', signUpError.code);
+            console.error('🔴 에러 메시지:', signUpError.message);
+            
+            // 이미 가입된 사용자이지만 인증되지 않은 경우
+            if (signUpError.code === 'UsernameExistsException' || signUpError.message?.includes('An account with the given email already exists')) {
+              console.log('⚠️ 이미 가입된 계정 - verify 모드로 전환');
+              setPendingEmail(formData.email);
+              toast({ 
+                title: "이미 가입된 계정", 
+                description: "이메일 인증이 필요합니다. 인증 코드를 입력해주세요.",
+                variant: "default"
+              });
+              setMode("verify");
+            } else {
+              console.error('🔴 다른 에러 - 외부로 throw');
+              throw signUpError; // 다른 에러는 외부 catch로 전달
+            }
+          }
           break;
           
         case "verify":
-          await confirmSignUp(formData.email, formData.code);
+          const emailToVerify = pendingEmail || formData.email;
+          await confirmSignUp(emailToVerify, formData.code);
           toast({ title: "인증 완료", description: "환영합니다! 이제 로그인해주세요." });
           setMode("login");
+          setFormData({ ...formData, code: "" });
+          setPendingEmail("");
           break;
           
         case "forgot":
           await forgotPassword(formData.email);
+          setPendingEmail(formData.email); // 이메일 저장
           toast({ title: "코드 발송", description: "비밀번호 재설정 코드를 보냈습니다." });
           setMode("confirmReset");
           break;
           
         case "confirmReset":
-          await confirmPassword(formData.email, formData.code, formData.newPassword);
+          const emailToReset = pendingEmail || formData.email;
+          await confirmPassword(emailToReset, formData.code, formData.newPassword);
           toast({ title: "비밀번호 재설정 완료", description: "새 비밀번호로 로그인해주세요." });
           setMode("login");
+          setFormData({ ...formData, code: "", newPassword: "" });
+          setPendingEmail("");
           break;
       }
     } catch (error: any) {
@@ -136,7 +234,18 @@ const Auth = () => {
 
   const handleResendCode = async () => {
     try {
-      await resendConfirmationCode(formData.email);
+      const emailToResend = pendingEmail || formData.email;
+      if (!emailToResend) {
+        toast({
+          title: "오류",
+          description: "이메일 주소를 찾을 수 없습니다.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      console.log('인증 코드 재전송 시도:', emailToResend);
+      await resendConfirmationCode(emailToResend);
       toast({ title: "코드 재전송", description: "인증 코드를 재전송했습니다." });
     } catch (error: any) {
       const errorMessage = getAuthErrorMessage(error);
@@ -261,6 +370,8 @@ const Auth = () => {
                       {mode === "verify" && "이메일로 전송된 6자리 코드를 입력하세요"}
                       {mode === "confirmReset" && "인증 코드와 새 비밀번호를 입력하세요"}
                     </p>
+                    {/* 디버깅용 - 나중에 삭제 */}
+                    <p className="text-xs text-red-500 mt-2">현재 모드: {mode}</p>
                   </div>
                 </div>
 
@@ -308,13 +419,13 @@ const Auth = () => {
                           <Lock className="w-5 h-5" />
                         </div>
                         <input
-                          type="password"
+                          type={showPassword ? "text" : "password"}
                           name="password"
                           value={formData.password}
                           onChange={handleInputChange}
                           placeholder="••••••••"
                           className={cn(
-                            "w-full pl-11 pr-4 py-3.5 rounded-md border transition-all duration-300",
+                            "w-full pl-11 pr-12 py-3.5 rounded-md border transition-all duration-300",
                             "font-handwriting text-lg text-ink placeholder:text-ink/30",
                             "focus:outline-none focus:bg-aged-paper",
                             errors.password
@@ -322,6 +433,13 @@ const Auth = () => {
                                 : "bg-aged-paper/60 border-ink/10 group-hover:border-ink/30 focus:border-gold/60 focus:ring-1 focus:ring-gold/30"
                           )}
                         />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-ink/40 hover:text-gold transition-colors"
+                        >
+                          {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                        </button>
                        </div>
                        {errors.password && (
                         <div className="flex items-center gap-1.5 mt-1 ml-1 animate-in slide-in-from-left-1 duration-300">
@@ -349,25 +467,40 @@ const Auth = () => {
                           <Lock className="w-5 h-5" />
                         </div>
                         <input
-                          type="password"
+                          type={showConfirmPassword ? "text" : "password"}
                           name="confirmPassword"
                           value={formData.confirmPassword}
                           onChange={handleInputChange}
                           placeholder="••••••••"
                           className={cn(
-                            "w-full pl-11 pr-4 py-3.5 rounded-md border transition-all duration-300",
+                            "w-full pl-11 pr-12 py-3.5 rounded-md border transition-all duration-300",
                             "font-handwriting text-lg text-ink placeholder:text-ink/30",
                             "focus:outline-none focus:bg-aged-paper",
                             errors.confirmPassword
                                 ? "bg-red-50/50 border-red-800/30 focus:border-red-800/50 focus:ring-1 focus:ring-red-800/20" 
+                                : formData.confirmPassword && formData.password === formData.confirmPassword
+                                ? "bg-green-50/50 border-green-600/30 focus:border-green-600/50 focus:ring-1 focus:ring-green-600/20"
                                 : "bg-aged-paper/60 border-ink/10 group-hover:border-ink/30 focus:border-gold/60 focus:ring-1 focus:ring-gold/30"
                           )}
                         />
+                        <button
+                          type="button"
+                          onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-ink/40 hover:text-gold transition-colors"
+                        >
+                          {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                        </button>
                        </div>
                        {errors.confirmPassword && (
                         <div className="flex items-center gap-1.5 mt-1 ml-1 animate-in slide-in-from-left-1 duration-300">
-                            <AlertCircle className="w-3 h-3 text-red-800/70" />
+                            <X className="w-3 h-3 text-red-800/70" />
                             <p className="font-handwriting text-sm text-red-800/80">{errors.confirmPassword}</p>
+                        </div>
+                       )}
+                       {!errors.confirmPassword && formData.confirmPassword && formData.password === formData.confirmPassword && (
+                        <div className="flex items-center gap-1.5 mt-1 ml-1 animate-in slide-in-from-left-1 duration-300">
+                            <Check className="w-3 h-3 text-green-600" />
+                            <p className="font-handwriting text-sm text-green-600">비밀번호가 일치합니다</p>
                         </div>
                        )}
                     </div>
@@ -378,14 +511,17 @@ const Auth = () => {
                       {renderInput(KeyRound, "code", "text", "123456", "인증 코드")}
                       
                       {mode === "verify" && (
-                        <div className="text-center">
+                        <div className="text-center space-y-2">
+                          <p className="text-xs text-ink/50 font-handwriting">
+                            이메일을 받지 못하셨나요?
+                          </p>
                           <button 
                             type="button"
                             className="inline-flex items-center gap-1.5 text-xs font-handwriting text-ink/50 hover:text-gold transition-colors"
                             onClick={handleResendCode}
                           >
                             <RefreshCcw className="w-3 h-3" />
-                            코드가 오지 않았나요? 재전송
+                            인증 코드 재전송
                           </button>
                         </div>
                       )}
@@ -405,13 +541,13 @@ const Auth = () => {
                           <Lock className="w-5 h-5" />
                         </div>
                         <input
-                          type="password"
+                          type={showNewPassword ? "text" : "password"}
                           name="newPassword"
                           value={formData.newPassword}
                           onChange={handleInputChange}
                           placeholder="••••••••"
                           className={cn(
-                            "w-full pl-11 pr-4 py-3.5 rounded-md border transition-all duration-300",
+                            "w-full pl-11 pr-12 py-3.5 rounded-md border transition-all duration-300",
                             "font-handwriting text-lg text-ink placeholder:text-ink/30",
                             "focus:outline-none focus:bg-aged-paper",
                             errors.newPassword
@@ -419,6 +555,13 @@ const Auth = () => {
                                 : "bg-aged-paper/60 border-ink/10 group-hover:border-ink/30 focus:border-gold/60 focus:ring-1 focus:ring-gold/30"
                           )}
                         />
+                        <button
+                          type="button"
+                          onClick={() => setShowNewPassword(!showNewPassword)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-ink/40 hover:text-gold transition-colors"
+                        >
+                          {showNewPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                        </button>
                        </div>
                        {errors.newPassword && (
                         <div className="flex items-center gap-1.5 mt-1 ml-1 animate-in slide-in-from-left-1 duration-300">
@@ -468,17 +611,29 @@ const Auth = () => {
                 {mode !== "login" && (
                   <div className="mt-8 text-center pt-6 border-t border-ink/5">
                     <button
+                      type="button"
                       onClick={() => {
-                        if (mode === "signup") setMode("login");
-                        else if (mode === "forgot") setMode("login");
-                        else if (mode === "confirmReset") setMode("login");
-                        else setMode("login");
+                        console.log('🔘 하단 버튼 클릭 - 현재 mode:', mode);
+                        if (mode === "signup") {
+                          setMode("login");
+                        } else if (mode === "verify") {
+                          // verify 모드에서는 login으로 돌아가지 않음
+                          console.log('⚠️ verify 모드에서는 로그인으로 돌아가지 않습니다');
+                          return;
+                        } else if (mode === "forgot") {
+                          setMode("login");
+                        } else if (mode === "confirmReset") {
+                          setMode("login");
+                        } else {
+                          setMode("login");
+                        }
                         setErrors({});
                       }}
                       className="font-handwriting text-ink/60 hover:text-gold transition-colors text-sm"
                     >
                       {mode === "signup" && "이미 계정이 있으신가요? 로그인"}
-                      {(mode === "verify" || mode === "forgot" || mode === "confirmReset") && "로그인 화면으로 돌아가기"}
+                      {mode === "verify" && "인증 코드를 입력해주세요"}
+                      {(mode === "forgot" || mode === "confirmReset") && "로그인 화면으로 돌아가기"}
                     </button>
                     
                     {/* API 연동 오류 안내 */}
