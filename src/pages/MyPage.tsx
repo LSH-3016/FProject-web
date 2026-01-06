@@ -100,13 +100,32 @@ const MyPage = () => {
   const [inquirySubject, setInquirySubject] = useState("");
   const [inquiryMessage, setInquiryMessage] = useState("");
   
-  // 실제 사용자 정보 사용 (localStorage 대신)
-  const profileNickname = displayName || "사용자";
+  // 프로필 정보 상태 (백엔드 API에서 가져옴)
+  const [profileData, setProfileData] = useState<{
+    nickname: string;
+    name: string;
+    bio: string;
+    profileImageUrl: string;
+  } | null>(null);
+  const [isLoadingProfile, setIsLoadingProfile] = useState(true);
   
-  // 프로필 이미지는 localStorage에서 가져오기 (추후 DB 연동 가능)
+  // 실제 사용자 정보 사용 (API 우선, 로딩 중에는 "사용자")
+  const profileNickname = isLoadingProfile ? "사용자" : (profileData?.nickname || displayName || "사용자");
+  
+  // 프로필 이미지 (API 우선, localStorage 폴백)
   const storedProfileImage =
     typeof window !== "undefined" ? localStorage.getItem("profileImage") : null;
-  const profileImage = storedProfileImage ?? "";
+  const profileImage = profileData?.profileImageUrl || storedProfileImage || "";
+  
+  // 프로필 이미지 디버깅
+  useEffect(() => {
+    console.log('🖼️ MyPage - 프로필 이미지 상태:', {
+      'API profileImageUrl': profileData?.profileImageUrl,
+      'localStorage': storedProfileImage,
+      'final profileImage': profileImage,
+      'isLoadingProfile': isLoadingProfile
+    });
+  }, [profileData, storedProfileImage, profileImage, isLoadingProfile]);
   
   // Helper function to get Cognito ID token
   const getAuthToken = (): string | null => {
@@ -158,6 +177,82 @@ const MyPage = () => {
       return null;
     }
   };
+
+  // 프로필 정보 로드
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        const token = getAuthToken();
+        if (!token) {
+          console.warn('MyPage - 토큰이 없어서 프로필 로드 스킵');
+          setIsLoadingProfile(false);
+          return;
+        }
+
+        const response = await fetch(`${import.meta.env.VITE_COGNITO_API_URL}/api/user/profile`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          const profile = data.data;
+          console.log('📥 MyPage - 프로필 로드 성공:', profile);
+          console.log('📸 프로필 이미지 URL:', profile.profileImageUrl || profile.profile_image_url);
+          
+          setProfileData({
+            nickname: profile.nickname || profile.preferred_username || '',
+            name: profile.name || '',
+            bio: profile.bio || '',
+            profileImageUrl: profile.profileImageUrl || profile.profile_image_url || '',
+          });
+        } else {
+          console.warn('MyPage - 프로필 로드 실패:', response.status);
+        }
+      } catch (error) {
+        console.error('MyPage - 프로필 로드 오류:', error);
+      } finally {
+        setIsLoadingProfile(false);
+      }
+    };
+
+    fetchProfile();
+  }, [userId]);
+
+  // 페이지 포커스 시 프로필 새로고침
+  useEffect(() => {
+    const handleFocus = async () => {
+      const token = getAuthToken();
+      if (!token) return;
+
+      try {
+        const response = await fetch(`${import.meta.env.VITE_COGNITO_API_URL}/api/user/profile`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          const profile = data.data;
+          console.log('🔄 MyPage - 포커스 시 프로필 새로고침:', profile);
+          
+          setProfileData({
+            nickname: profile.nickname || profile.preferred_username || '',
+            name: profile.name || '',
+            bio: profile.bio || '',
+            profileImageUrl: profile.profileImageUrl || profile.profile_image_url || '',
+          });
+        }
+      } catch (error) {
+        console.error('MyPage - 포커스 시 프로필 로드 오류:', error);
+      }
+    };
+
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, [userId]);
 
   const closeWithdrawModal = () => {
     setIsWithdrawOpen(false);
@@ -605,6 +700,15 @@ const MyPage = () => {
                         src={profileImage}
                         alt="프로필 사진"
                         className="h-full w-full object-cover"
+                        crossOrigin="anonymous"
+                        onError={(e) => {
+                          console.error('프로필 이미지 로드 실패:', profileImage);
+                          console.error('CORS 에러일 가능성이 높습니다. S3 버킷 CORS 설정을 확인하세요.');
+                          e.currentTarget.style.display = 'none';
+                        }}
+                        onLoad={() => {
+                          console.log('✅ 프로필 이미지 로드 성공:', profileImage);
+                        }}
                       />
                     ) : (
                       <User className="w-8 h-8 text-muted-foreground" />

@@ -18,7 +18,6 @@ const Auth = () => {
   const getInitialMode = (): AuthMode => {
     const savedMode = sessionStorage.getItem('authMode');
     if (savedMode && ['login', 'signup', 'verify', 'forgot', 'confirmReset'].includes(savedMode)) {
-      console.log('📦 sessionStorage에서 mode 복원:', savedMode);
       return savedMode as AuthMode;
     }
     return 'login';
@@ -29,7 +28,6 @@ const Auth = () => {
   
   // mode 변경 시 sessionStorage에 저장
   const setMode = (newMode: AuthMode) => {
-    console.log('📝 mode 변경:', mode, '->', newMode);
     sessionStorage.setItem('authMode', newMode);
     setModeState(newMode);
   };
@@ -41,8 +39,6 @@ const Auth = () => {
       sessionStorage.removeItem('pendingEmail');
     }
   }, [isAuthenticated]);
-  
-  console.log('🏗️ Auth 컴포넌트 렌더링 - mode:', mode);
   
   const [formData, setFormData] = useState({
     email: "",
@@ -75,7 +71,7 @@ const Auth = () => {
 
   // mode 변경 감지
   useEffect(() => {
-    console.log('🔄 mode 변경됨:', mode);
+    // mode 변경 시 필요한 로직
   }, [mode]);
 
   useEffect(() => {
@@ -85,9 +81,7 @@ const Auth = () => {
 
   // Redirect if already authenticated (but not during signup verification)
   useEffect(() => {
-    console.log('🔍 useEffect 실행 - isAuthenticated:', isAuthenticated, 'mode:', mode);
     if (isAuthenticated && mode !== "verify") {
-      console.log('🚀 /journal로 리다이렉트');
       // 로그인 완료 후 일기 페이지로 이동
       navigate("/journal", { replace: true });
     }
@@ -613,7 +607,6 @@ const Auth = () => {
                     <button
                       type="button"
                       onClick={() => {
-                        console.log('🔘 하단 버튼 클릭 - 현재 mode:', mode);
                         if (mode === "signup") {
                           setMode("login");
                         } else if (mode === "verify") {

@@ -242,9 +242,26 @@ export class JournalApiService {
   // S3 키로 파일 URL 가져오기 (Library API 사용)
   async getFileUrlFromS3Key(s3Key: string): Promise<string | null> {
     try {
+      // Cognito 토큰 가져오기
+      const clientId = import.meta.env.VITE_COGNITO_CLIENT_ID;
+      let token = null;
+      
+      if (clientId) {
+        const cognitoKeys = Object.keys(localStorage).filter(key => 
+          key.includes('CognitoIdentityServiceProvider') && 
+          key.includes(clientId) &&
+          key.endsWith('.idToken')
+        );
+        token = cognitoKeys.length > 0 ? localStorage.getItem(cognitoKeys[0]) : null;
+      }
+      
       // Library API URL 가져오기
       const libraryApiUrl = import.meta.env.VITE_LIBRARY_API_URL || "http://192.168.0.138:8000/api/v1";
-      const response = await fetch(`${libraryApiUrl}/library-items/url-by-key?s3_key=${encodeURIComponent(s3Key)}`);
+      const response = await fetch(`${libraryApiUrl}/library-items/url-by-key?s3_key=${encodeURIComponent(s3Key)}`, {
+        headers: {
+          ...(token && { 'Authorization': `Bearer ${token}` }),
+        },
+      });
 
       if (!response.ok) {
         console.error(`S3 URL 조회 실패: ${response.status}`);

@@ -25,6 +25,10 @@ export const JournalBook = () => {
   const { userId, displayName, name, nickname, isLoading: authLoading, isReady } = useCurrentUser();
   const entriesContainerRef = useRef<HTMLDivElement>(null);
   
+  // 프로필 정보 상태 (백엔드 API에서 가져옴)
+  const [profileNickname, setProfileNickname] = useState<string>("");
+  const [isLoadingProfile, setIsLoadingProfile] = useState(true);
+  
   // 삭제 관련 상태
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [deleteTargetIndex, setDeleteTargetIndex] = useState<number | null>(null);
@@ -39,9 +43,58 @@ export const JournalBook = () => {
 
   // API 관련 상태
   const currentUserId = userId; // useCurrentUser 훅에서 가져온 userId 사용
-  const finalDisplayName = name || nickname || displayName; // 사용자 이름 우선순위
+  // 닉네임 우선순위: API 닉네임 > Cognito 닉네임 > 이름 > displayName
+  const finalDisplayName = isLoadingProfile ? "사용자" : (profileNickname || nickname || name || displayName);
   const API_BASE_URL = import.meta.env.VITE_JOURNAL_API_URL || "http://localhost:8000";
   const LIBRARY_API_URL = import.meta.env.VITE_LIBRARY_API_URL || "http://192.168.0.138:8000/api/v1";
+
+  // 프로필 정보 로드
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        const clientId = import.meta.env.VITE_COGNITO_CLIENT_ID;
+        if (!clientId) {
+          setIsLoadingProfile(false);
+          return;
+        }
+
+        const cognitoKeys = Object.keys(localStorage).filter(key => 
+          key.includes('CognitoIdentityServiceProvider') && 
+          key.includes(clientId) &&
+          key.endsWith('.idToken')
+        );
+
+        if (cognitoKeys.length === 0) {
+          setIsLoadingProfile(false);
+          return;
+        }
+
+        const token = localStorage.getItem(cognitoKeys[0]);
+        if (!token) {
+          setIsLoadingProfile(false);
+          return;
+        }
+
+        const response = await fetch(`${import.meta.env.VITE_COGNITO_API_URL}/api/user/profile`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          const profile = data.data;
+          setProfileNickname(profile.nickname || profile.preferred_username || '');
+        }
+      } catch (error) {
+        console.error('JournalBook - 프로필 로드 오류:', error);
+      } finally {
+        setIsLoadingProfile(false);
+      }
+    };
+
+    fetchProfile();
+  }, [userId]);
 
   // 인증되지 않은 경우 또는 사용자 ID가 없는 경우 처리
   if (authLoading) {

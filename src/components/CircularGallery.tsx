@@ -591,7 +591,8 @@ class App {
     ];
     // 빈 배열이 전달되면 빈 배열 사용, undefined나 null이면 기본 이미지 사용
     const galleryItems = (items !== undefined && items.length === 0) ? [] : (items && items.length ? items : defaultItems);
-    this.mediasImages = galleryItems.concat(galleryItems);
+    // 무한 스크롤을 위해 배열을 복제 (최소 6개 이상일 때만)
+    this.mediasImages = galleryItems.length >= 6 ? galleryItems.concat(galleryItems) : galleryItems;
     this.medias = this.mediasImages.map((data, index) => {
       return new Media({
         geometry: this.planeGeometry,

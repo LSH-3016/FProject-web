@@ -14,9 +14,10 @@ interface GrimoireProps {
   onFlip?: (e: any) => void;
   flipTrigger?: number;
   onDataChange?: () => void;
+  bookSubtitle?: string;
 }
 
-export const Grimoire: React.FC<GrimoireProps> = ({ content, isLoading, onFlip, flipTrigger = 0, onDataChange }) => {
+export const Grimoire: React.FC<GrimoireProps> = ({ content, isLoading, onFlip, flipTrigger = 0, onDataChange, bookSubtitle }) => {
   const bookRef = useRef<any>(null);
   const [windowSize, setWindowSize] = useState({ width: window.innerWidth, height: window.innerHeight });
   const [isBookReady, setIsBookReady] = useState(false);
@@ -199,7 +200,7 @@ export const Grimoire: React.FC<GrimoireProps> = ({ content, isLoading, onFlip, 
             </h1>
             <div className="w-32 h-[3px] bg-gradient-to-r from-transparent via-amber-900/60 to-transparent mb-8 mx-auto"></div>
             <p className="font-antique text-2xl text-amber-900 font-bold uppercase tracking-[0.3em] mb-12">
-              {KOREAN_UI_TEXTS.bookSubtitle}
+              {bookSubtitle || KOREAN_UI_TEXTS.bookSubtitle}
             </p>
 
             {/* 클릭 유도 텍스트 */}

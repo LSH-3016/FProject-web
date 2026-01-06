@@ -46,12 +46,67 @@ const LibraryDetailPage = () => {
   const { type } = useParams<{ type: string }>();
   const navigate = useNavigate();
   const { isAuthenticated, isLoading: authLoading, isCognitoConfigured } = useAuth();
-  const { displayName, isLoading: userLoading } = useCurrentUser();
+  const { displayName, isLoading: userLoading, userId } = useCurrentUser();
   const { getItemsByType, deleteItems, addItem, updateItemsVisibility } = useLibraryContext();
   const menuRef = useRef<HTMLDivElement | null>(null);
 
   const itemType = type as LibraryItemType;
   const config = libraryTypeConfigs.find((item) => item.type === itemType);
+
+  // 프로필 정보 상태 (백엔드 API에서 가져옴)
+  const [profileNickname, setProfileNickname] = useState<string>("");
+  const [isLoadingProfile, setIsLoadingProfile] = useState(true);
+
+  // 프로필 정보 로드
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        const clientId = import.meta.env.VITE_COGNITO_CLIENT_ID;
+        if (!clientId) {
+          setIsLoadingProfile(false);
+          return;
+        }
+
+        const cognitoKeys = Object.keys(localStorage).filter(key => 
+          key.includes('CognitoIdentityServiceProvider') && 
+          key.includes(clientId) &&
+          key.endsWith('.idToken')
+        );
+
+        if (cognitoKeys.length === 0) {
+          setIsLoadingProfile(false);
+          return;
+        }
+
+        const token = localStorage.getItem(cognitoKeys[0]);
+        if (!token) {
+          setIsLoadingProfile(false);
+          return;
+        }
+
+        const response = await fetch(`${import.meta.env.VITE_COGNITO_API_URL}/api/user/profile`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          const profile = data.data;
+          setProfileNickname(profile.nickname || profile.preferred_username || '');
+        }
+      } catch (error) {
+        console.error('LibraryDetailPage - 프로필 로드 오류:', error);
+      } finally {
+        setIsLoadingProfile(false);
+      }
+    };
+
+    fetchProfile();
+  }, [userId]);
+
+  // 표시할 닉네임 (API 우선, 로딩 중에는 "사용자")
+  const userDisplayName = isLoadingProfile ? "사용자" : (profileNickname || displayName || "사용자");
 
   // 인증 확인 및 리다이렉트
   useEffect(() => {
@@ -236,7 +291,7 @@ const LibraryDetailPage = () => {
               <div>
                 <h1 className="font-serif text-2xl text-primary gold-accent">{config.label}</h1>
                 <p className="font-handwriting text-base text-muted-foreground">
-                  {displayName}님의 {items.length}개 항목
+                  {userDisplayName}님의 {items.length}개 항목
                   {!isCognitoConfigured && <span className="text-yellow-600 ml-2">(데모 모드)</span>}
                 </p>
               </div>

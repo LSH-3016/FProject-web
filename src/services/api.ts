@@ -54,7 +54,29 @@ const S3_REGION = import.meta.env.VITE_S3_REGION || "ap-northeast-2";
 
 class ApiService {
   private getAuthHeaders(): HeadersInit {
-    const token = localStorage.getItem("auth_token");
+    // Cognito 토큰 가져오기
+    const clientId = import.meta.env.VITE_COGNITO_CLIENT_ID;
+    
+    if (!clientId) {
+      console.warn('VITE_COGNITO_CLIENT_ID가 설정되지 않았습니다');
+      return {
+        "Content-Type": "application/json",
+      };
+    }
+    
+    // localStorage에서 Cognito 토큰 찾기
+    const cognitoKeys = Object.keys(localStorage).filter(key => 
+      key.includes('CognitoIdentityServiceProvider') && 
+      key.includes(clientId) &&
+      key.endsWith('.idToken')
+    );
+    
+    const token = cognitoKeys.length > 0 ? localStorage.getItem(cognitoKeys[0]) : null;
+    
+    if (!token) {
+      console.warn('⚠️ ApiService - Cognito 토큰을 찾을 수 없습니다');
+    }
+    
     return {
       "Content-Type": "application/json",
       ...(token && { Authorization: `Bearer ${token}` }),

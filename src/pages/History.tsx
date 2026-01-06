@@ -22,10 +22,63 @@ const History = () => {
   const [searchResults, setSearchResults] = useState<HistoryEventUI[]>([]);
   const [showSidebar, setShowSidebar] = useState(false);
   const [recentViewed, setRecentViewed] = useState<string[]>([]); // 최근 본 기록 (날짜 형식)
+  const [profileNickname, setProfileNickname] = useState<string>("");
+  const [isLoadingProfile, setIsLoadingProfile] = useState(true);
   
   const navigate = useNavigate();
   const { isAuthenticated, isLoading: authLoading, isCognitoConfigured } = useAuth();
   const { displayName, userId, isLoading: userLoading } = useCurrentUser();
+
+  // 표시할 닉네임 (API 우선, 로딩 중에는 "사용자")
+  const userDisplayName = isLoadingProfile ? "사용자" : (profileNickname || displayName || "사용자");
+
+  // 프로필 정보 로드
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        const clientId = import.meta.env.VITE_COGNITO_CLIENT_ID;
+        if (!clientId) {
+          setIsLoadingProfile(false);
+          return;
+        }
+
+        const cognitoKeys = Object.keys(localStorage).filter(key => 
+          key.includes('CognitoIdentityServiceProvider') && 
+          key.includes(clientId) &&
+          key.endsWith('.idToken')
+        );
+
+        if (cognitoKeys.length === 0) {
+          setIsLoadingProfile(false);
+          return;
+        }
+
+        const token = localStorage.getItem(cognitoKeys[0]);
+        if (!token) {
+          setIsLoadingProfile(false);
+          return;
+        }
+
+        const response = await fetch(`${import.meta.env.VITE_COGNITO_API_URL}/api/user/profile`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          const profile = data.data;
+          setProfileNickname(profile.nickname || profile.preferred_username || '');
+        }
+      } catch (error) {
+        console.error('History - 프로필 로드 오류:', error);
+      } finally {
+        setIsLoadingProfile(false);
+      }
+    };
+
+    fetchProfile();
+  }, [userId]);
 
   // 인증 확인 및 리다이렉트
   useEffect(() => {
@@ -333,7 +386,7 @@ const History = () => {
               type="text"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder={`${displayName}님의 ${KOREAN_UI_TEXTS.searchPlaceholder}`}
+              placeholder={`${userDisplayName}님의 ${KOREAN_UI_TEXTS.searchPlaceholder}`}
               disabled={appState === AppState.LOADING}
               className="w-full px-6 py-4 pr-14 text-lg rounded-full border-4 border-amber-700 bg-amber-50/95 text-amber-900 placeholder-amber-700 focus:outline-none focus:ring-4 focus:ring-amber-500 disabled:opacity-50 shadow-2xl backdrop-blur-sm font-serif"
             />
@@ -520,6 +573,7 @@ const History = () => {
               isLoading={appState === AppState.LOADING}
               flipTrigger={flipTrigger}
               onDataChange={loadHistory}
+              bookSubtitle={`${userDisplayName}의 기록`}
             />
           )}
         </ErrorBoundary>

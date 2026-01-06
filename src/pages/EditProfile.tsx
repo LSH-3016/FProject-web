@@ -18,6 +18,7 @@ const EditProfile = () => {
   const [bio, setBio] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
   const [profilePreview, setProfilePreview] = useState("");
+  const [profileFile, setProfileFile] = useState<File | null>(null);
   
   // 유효성 검증 상태
   const [nicknameError, setNicknameError] = useState<string | null>(null);
@@ -91,10 +92,7 @@ const EditProfile = () => {
       try {
         const token = getAuthToken();
         if (!token) {
-          console.warn('토큰이 없습니다. Cognito 정보만 사용합니다.');
-          // Cognito 정보로 초기화
-          setNickname(user.nickname || user.name || "");
-          setName(user.name || "");
+          console.warn('토큰이 없습니다. API 호출 불가');
           setIsLoadingProfile(false);
           return;
         }
@@ -106,26 +104,25 @@ const EditProfile = () => {
           },
         });
 
+        console.log('📥 프로필 로드 응답 상태:', response.status);
+
         if (response.ok) {
           const data = await response.json();
+          console.log('📥 프로필 로드 응답 데이터:', data);
           const profile = data.data;
+          console.log('📥 프로필 데이터:', profile);
           
-          setNickname(profile.nickname || "");
+          setNickname(profile.nickname || profile.preferred_username || "");
           setName(profile.name || "");
           setBio(profile.bio || "");
-          setPhoneNumber(profile.phoneNumber || "");
-          setProfilePreview(profile.profileImageUrl || "");
+          setPhoneNumber(profile.phoneNumber || profile.phone_number || "");
+          setProfilePreview(profile.profileImageUrl || profile.profile_image_url || "");
         } else {
-          // API 실패 시 Cognito 정보 사용
-          console.warn('프로필 로드 실패, Cognito 정보 사용');
-          setNickname(user.nickname || user.name || "");
-          setName(user.name || "");
+          const errorText = await response.text();
+          console.error('❌ 프로필 로드 실패:', response.status, errorText);
         }
       } catch (error) {
         console.error('프로필 로드 중 오류:', error);
-        // 에러 발생 시 Cognito 정보 사용
-        setNickname(user.nickname || user.name || "");
-        setName(user.name || "");
       } finally {
         setIsLoadingProfile(false);
       }
@@ -237,28 +234,98 @@ const EditProfile = () => {
         return;
       }
 
-      // 업데이트할 필드
-      const updates: any = {
-        nickname: nickname.trim(),
-        name: name.trim(),
-        bio: bio.trim(),
-        phone_number: phoneNumber.trim() || null,
-        profile_image_url: profilePreview || null,
-      };
+      // Step 1: Upload profile image if changed
+      if (profileFile) {
+        console.log('📤 이미지 업로드 시작:', profileFile.name, profileFile.size, profileFile.type);
+        
+        const formData = new FormData();
+        formData.append('image', profileFile);
 
-      // 백엔드 API로 프로필 업데이트
-      const response = await fetch(`${import.meta.env.VITE_COGNITO_API_URL}/api/user/profile`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(updates),
-      });
+        const imageUrl = `${import.meta.env.VITE_COGNITO_API_URL}/api/user/profile/image`;
+        console.log('📤 이미지 업로드 URL:', imageUrl);
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || '프로필 업데이트에 실패했습니다.');
+        const imageResponse = await fetch(imageUrl, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+          body: formData,
+        });
+
+        console.log('📤 이미지 업로드 응답 상태:', imageResponse.status);
+
+        if (!imageResponse.ok) {
+          const errorText = await imageResponse.text();
+          console.error('❌ 이미지 업로드 실패:', errorText);
+          try {
+            const errorData = JSON.parse(errorText);
+            throw new Error(errorData.message || '프로필 이미지 업로드에 실패했습니다.');
+          } catch {
+            throw new Error(`프로필 이미지 업로드 실패: ${imageResponse.status} - ${errorText}`);
+          }
+        }
+        
+        // 업로드 성공 후 응답에서 이미지 URL 받기
+        const imageData = await imageResponse.json();
+        console.log('✅ 프로필 이미지 업로드 성공 - 전체 응답:', JSON.stringify(imageData, null, 2));
+        console.log('📦 imageData.data:', imageData.data);
+        console.log('📦 imageData.data?.profileImageUrl:', imageData.data?.profileImageUrl);
+        console.log('📦 imageData.data?.profile_image_url:', imageData.data?.profile_image_url);
+        
+        // 응답에서 이미지 URL 추출하여 미리보기 업데이트
+        if (imageData.data?.profileImageUrl || imageData.data?.profile_image_url) {
+          const uploadedImageUrl = imageData.data.profileImageUrl || imageData.data.profile_image_url;
+          setProfilePreview(uploadedImageUrl);
+          console.log('📸 업로드된 이미지 URL 설정:', uploadedImageUrl);
+        } else {
+          console.warn('⚠️ 응답에 이미지 URL이 없습니다');
+        }
+      }
+
+      // Step 2: Update other profile fields
+      const updates: any = {};
+      
+      if (nickname.trim()) {
+        updates.nickname = nickname.trim();
+      }
+      if (name.trim()) {
+        updates.name = name.trim();
+      }
+      if (bio.trim() !== undefined) {
+        updates.bio = bio.trim();
+      }
+      if (phoneNumber !== undefined) {
+        updates.phone_number = phoneNumber.trim() || null;
+      }
+
+      console.log('📝 프로필 업데이트 데이터:', updates);
+
+      // Only update if there are changes
+      if (Object.keys(updates).length > 0) {
+        const profileUrl = `${import.meta.env.VITE_COGNITO_API_URL}/api/user/profile`;
+        console.log('📝 프로필 업데이트 URL:', profileUrl);
+
+        const response = await fetch(profileUrl, {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(updates),
+        });
+
+        console.log('📝 프로필 업데이트 응답 상태:', response.status);
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('❌ 프로필 업데이트 실패:', errorText);
+          try {
+            const errorData = JSON.parse(errorText);
+            throw new Error(errorData.message || '프로필 업데이트에 실패했습니다.');
+          } catch {
+            throw new Error(`프로필 업데이트 실패: ${response.status} - ${errorText}`);
+          }
+        }
       }
 
       // AuthContext의 user 정보 업데이트
@@ -287,7 +354,8 @@ const EditProfile = () => {
 
   const handleConfirm = () => {
     setIsCompleteOpen(false);
-    navigate("/mypage");
+    // state를 전달하여 MyPage에서 프로필을 새로고침하도록 함
+    navigate("/mypage", { state: { refreshProfile: true } });
   };
 
   const handleProfileClick = () => {
@@ -299,6 +367,11 @@ const EditProfile = () => {
     if (!file) {
       return;
     }
+    
+    // Store the file for upload
+    setProfileFile(file);
+    
+    // Create preview
     const reader = new FileReader();
     reader.onload = () => {
       if (typeof reader.result === "string") {
@@ -310,6 +383,7 @@ const EditProfile = () => {
 
   const handleProfileClear = () => {
     setProfilePreview("");
+    setProfileFile(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }

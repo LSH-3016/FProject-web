@@ -74,6 +74,59 @@ const LibraryPage = () => {
   const { isAuthenticated, isLoading: authLoading, isCognitoConfigured } = useAuth();
   const { displayName, userId, isLoading: userLoading } = useCurrentUser();
   const { getLatestItemByType, getItemCountByType, getItemsByType, addItem, items, loading, error } = useLibraryContext();
+  const [profileNickname, setProfileNickname] = useState<string>("");
+  const [isLoadingProfile, setIsLoadingProfile] = useState(true);
+
+  // 표시할 닉네임 (API 우선, 로딩 중에는 "사용자")
+  const userDisplayName = isLoadingProfile ? "사용자" : (profileNickname || displayName || "사용자");
+
+  // 프로필 정보 로드
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        const clientId = import.meta.env.VITE_COGNITO_CLIENT_ID;
+        if (!clientId) {
+          setIsLoadingProfile(false);
+          return;
+        }
+
+        const cognitoKeys = Object.keys(localStorage).filter(key => 
+          key.includes('CognitoIdentityServiceProvider') && 
+          key.includes(clientId) &&
+          key.endsWith('.idToken')
+        );
+
+        if (cognitoKeys.length === 0) {
+          setIsLoadingProfile(false);
+          return;
+        }
+
+        const token = localStorage.getItem(cognitoKeys[0]);
+        if (!token) {
+          setIsLoadingProfile(false);
+          return;
+        }
+
+        const response = await fetch(`${import.meta.env.VITE_COGNITO_API_URL}/api/user/profile`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          const profile = data.data;
+          setProfileNickname(profile.nickname || profile.preferred_username || '');
+        }
+      } catch (error) {
+        console.error('LibraryPage - 프로필 로드 오류:', error);
+      } finally {
+        setIsLoadingProfile(false);
+      }
+    };
+
+    fetchProfile();
+  }, [userId]);
 
   // 인증 확인 및 리다이렉트
   useEffect(() => {
@@ -223,10 +276,10 @@ const LibraryPage = () => {
               <FolderOpen className="w-8 h-8 text-gold" />
             </div>
             <h1 className="font-serif text-3xl text-primary mb-2 gold-accent">
-              라이브러리
+              {userDisplayName}님의 라이브러리
             </h1>
             <p className="font-handwriting text-xl text-muted-foreground">
-              {displayName}님의 사진, 영상, 문서를 보관하세요
+              사진, 영상, 문서를 보관하세요
             </p>
             {!isCognitoConfigured && (
               <div className="mt-4 p-3 bg-yellow-50/50 border border-yellow-200/50 rounded-md">
