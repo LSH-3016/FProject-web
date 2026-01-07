@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { summarizeJournalEntries, type SummaryResult } from "@/lib/bedrock";
 import { JournalApiService } from "../services/journalApi";
-import { apiService } from "@/services/api";
+import { apiService as libraryApiService } from "@/services/api";
 
 export const useJournalSummary = (userId: string, apiBaseUrl: string, libraryApiUrl: string) => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -115,13 +115,28 @@ export const useJournalSummary = (userId: string, apiBaseUrl: string, libraryApi
     try {
       const checkData = await apiService.checkHistory(userId);
       
-      if (checkData.exists) {
-        setExistingHistoryDate(checkData.record_date || null);
-        setExistingHistoryId(checkData.id || null);
-        setIsOverwriteDialogOpen(true);
-        return;
+      console.log('히스토리 확인 결과:', checkData);
+      
+      // 오늘 날짜 확인
+      const today = new Date();
+      const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+      
+      // exists가 true이고, record_date가 오늘 날짜인 경우에만 덮어쓰기 다이얼로그 표시
+      if (checkData.exists && checkData.record_date) {
+        const recordDate = checkData.record_date.split('T')[0]; // ISO 형식에서 날짜 부분만 추출
+        console.log('비교 - 오늘:', todayStr, '기록 날짜:', recordDate);
+        
+        if (recordDate === todayStr) {
+          setExistingHistoryDate(checkData.record_date);
+          setExistingHistoryId(checkData.id || null);
+          setIsOverwriteDialogOpen(true);
+          return;
+        } else {
+          console.log('기록 날짜가 오늘이 아님 - 신규 저장 진행');
+        }
       }
       
+      // 히스토리가 없거나 오늘 날짜가 아니면 바로 저장
       await performSaveToHistory(false, null);
       
     } catch (error) {
@@ -183,33 +198,77 @@ export const useJournalSummary = (userId: string, apiBaseUrl: string, libraryApi
       
       // 새로운 사진이 선택되었으면 업로드 (기존 사진이 있어도 덮어쓰기)
       if (selectedImage) {
-        console.log('사진 업로드 시작:', selectedImage.name);
+        console.log('=== 사진 업로드 시작 (Presigned URL 방식) ===');
+        console.log('파일명:', selectedImage.name);
+        console.log('파일 크기:', selectedImage.size);
+        console.log('파일 타입:', selectedImage.type);
         
         try {
-          const formData = new FormData();
-          formData.append('file', selectedImage);
-          formData.append('name', selectedImage.name.replace(/\.[^/.]+$/, ''));
-          formData.append('visibility', 'private');
-          
-          const uploadResponse = await fetch(`${libraryApiUrl}/upload/upload-and-get-url`, {
-            method: 'POST',
-            body: formData
-          });
-          
-          if (uploadResponse.ok) {
-            const uploadResult = await uploadResponse.json();
-            s3Key = uploadResult.data?.s3_key || null;
-            if (s3Key) {
-              console.log('사진 업로드 성공:', selectedImage.name, '-> S3 Key:', s3Key);
-            } else {
-              console.error('S3 Key를 받지 못했습니다:', uploadResult);
+          // Library API Service의 uploadFile 메서드 사용 (Presigned URL 방식)
+          // 이 방식은 S3에 직접 업로드하므로 CloudFront를 거치지 않음
+          const uploadedItem = await libraryApiService.uploadFile(
+            selectedImage,
+            selectedImage.name.replace(/\.[^/.]+$/, ''),
+            'private',
+            (progress) => {
+              console.log('업로드 진행률:', Math.round(progress) + '%');
             }
-          } else {
-            const errorData = await uploadResponse.json().catch(() => ({}));
-            console.error('사진 업로드 실패:', selectedImage.name, errorData);
+          );
+          
+          console.log('✅ 사진 업로드 성공:', uploadedItem);
+          
+          // 업로드된 아이템의 ID로 백엔드에서 s3_key 조회
+          if (uploadedItem.id) {
+            try {
+              // Cognito 토큰 가져오기
+              const clientId = import.meta.env.VITE_COGNITO_CLIENT_ID;
+              let authToken: string | null = null;
+              
+              if (clientId) {
+                const cognitoKeys = Object.keys(localStorage).filter(key => 
+                  key.includes('CognitoIdentityServiceProvider') && 
+                  key.includes(clientId) &&
+                  key.endsWith('.idToken')
+                );
+                
+                if (cognitoKeys.length > 0) {
+                  authToken = localStorage.getItem(cognitoKeys[0]);
+                }
+              }
+              
+              const headers: HeadersInit = {
+                "Content-Type": "application/json",
+              };
+              
+              if (authToken) {
+                headers['Authorization'] = `Bearer ${authToken}`;
+              }
+              
+              const response = await fetch(`${libraryApiUrl}/library-items/${uploadedItem.id}`, {
+                headers,
+              });
+              
+              if (response.ok) {
+                const itemDetail = await response.json();
+                s3Key = itemDetail.data?.s3_key || itemDetail.s3_key || null;
+                console.log('업로드된 파일의 S3 Key:', s3Key);
+              } else {
+                console.error('아이템 상세 조회 실패:', response.status);
+              }
+            } catch (detailError) {
+              console.error('아이템 상세 조회 중 오류:', detailError);
+            }
           }
+          
+          if (!s3Key) {
+            console.warn('⚠️ S3 Key를 가져오지 못했습니다. 히스토리에 이미지가 연결되지 않을 수 있습니다.');
+          }
+          
         } catch (uploadError) {
-          console.error('사진 업로드 중 오류:', uploadError);
+          console.error('❌ 사진 업로드 중 예외 발생:', uploadError);
+          if (uploadError instanceof Error) {
+            console.error('에러 메시지:', uploadError.message);
+          }
         }
       }
 
