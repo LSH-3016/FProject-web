@@ -132,6 +132,7 @@ export const JournalBook = () => {
     isLoadingEntries,
     isSaving,
     addEntry,
+    updateEntry,
     deleteEntry
   } = useJournalEntries(currentUserId, API_BASE_URL);
 
@@ -200,6 +201,16 @@ export const JournalBook = () => {
       
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "입력 처리에 실패했습니다.");
+      setIsErrorDialogOpen(true);
+    }
+  };
+
+  // 수정 핸들러
+  const handleUpdateEntry = async (entryId: string, content: string) => {
+    try {
+      await updateEntry(entryId, content);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "기록 수정에 실패했습니다.");
       setIsErrorDialogOpen(true);
     }
   };
@@ -301,6 +312,7 @@ export const JournalBook = () => {
                 key={entry.id}
                 entry={entry}
                 index={idx}
+                onUpdate={handleUpdateEntry}
                 onDelete={handleDeleteRequest}
               />
             ))}

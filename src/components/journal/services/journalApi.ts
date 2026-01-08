@@ -48,6 +48,25 @@ export class JournalApiService {
     return await response.json();
   }
 
+  // 메시지 수정
+  async updateEntry(entryId: string, content: string): Promise<JournalEntry> {
+    const response = await fetch(`${this.apiBaseUrl}/messages/${entryId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content })
+    });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    return {
+      ...data,
+      created_at: new Date(data.created_at)
+    };
+  }
+
   // 메시지 삭제
   async deleteEntry(entryId: string): Promise<void> {
     const response = await fetch(`${this.apiBaseUrl}/messages/${entryId}`, { 

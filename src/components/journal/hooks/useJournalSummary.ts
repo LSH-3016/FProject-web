@@ -121,8 +121,8 @@ export const useJournalSummary = (userId: string, apiBaseUrl: string, libraryApi
       const today = new Date();
       const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
       
-      // exists가 true이고, record_date가 오늘 날짜인 경우에만 덮어쓰기 다이얼로그 표시
-      if (checkData.exists && checkData.record_date) {
+      // exists가 true이고, record_date가 존재하고, 오늘 날짜인 경우에만 덮어쓰기 다이얼로그 표시
+      if (checkData.exists === true && checkData.record_date) {
         const recordDate = checkData.record_date.split('T')[0]; // ISO 형식에서 날짜 부분만 추출
         console.log('비교 - 오늘:', todayStr, '기록 날짜:', recordDate);
         
@@ -134,6 +134,8 @@ export const useJournalSummary = (userId: string, apiBaseUrl: string, libraryApi
         } else {
           console.log('기록 날짜가 오늘이 아님 - 신규 저장 진행');
         }
+      } else {
+        console.log('오늘 날짜의 히스토리 없음 - 신규 저장 진행');
       }
       
       // 히스토리가 없거나 오늘 날짜가 아니면 바로 저장

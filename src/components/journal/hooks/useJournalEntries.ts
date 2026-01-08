@@ -63,6 +63,19 @@ export const useJournalEntries = (userId: string, apiBaseUrl: string) => {
     }
   };
 
+  // 엔트리 수정
+  const updateEntry = async (entryId: string, content: string) => {
+    try {
+      const updatedEntry = await apiService.updateEntry(entryId, content);
+      setEntries(prev => prev.map(entry => 
+        entry.id === entryId ? updatedEntry : entry
+      ));
+    } catch (error) {
+      console.error("기록 수정 실패:", error);
+      throw new Error("기록 수정에 실패했습니다. 다시 시도해주세요.");
+    }
+  };
+
   // 엔트리 삭제
   const deleteEntry = async (entryId: string) => {
     try {
@@ -84,6 +97,7 @@ export const useJournalEntries = (userId: string, apiBaseUrl: string) => {
     isLoadingEntries,
     isSaving,
     addEntry,
+    updateEntry,
     deleteEntry,
     loadUserEntries
   };

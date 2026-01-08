@@ -364,8 +364,6 @@ const Auth = () => {
                       {mode === "verify" && "이메일로 전송된 6자리 코드를 입력하세요"}
                       {mode === "confirmReset" && "인증 코드와 새 비밀번호를 입력하세요"}
                     </p>
-                    {/* 디버깅용 - 나중에 삭제 */}
-                    <p className="text-xs text-red-500 mt-2">현재 모드: {mode}</p>
                   </div>
                 </div>
 
