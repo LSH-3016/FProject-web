@@ -2,11 +2,23 @@ import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react'
 import HTMLFlipBook from 'react-pageflip';
 import { Page } from './Page';
 import { HistoryEventUI, KOREAN_UI_TEXTS } from '@/types/history';
-import { ChevronLeft, ChevronRight, Loader2, BookOpen, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Loader2, BookOpen, X, Sparkles, ImagePlus } from 'lucide-react';
 import { JournalApiService } from '@/components/journal/services/journalApi';
+import { imageGeneratorApi } from '@/services/imageGeneratorApi';
 
 const API_BASE_URL = import.meta.env.VITE_JOURNAL_API_URL || 'http://localhost:8000';
 const journalApi = new JournalApiService(API_BASE_URL);
+
+// AI 이미지 생성 팝업 상태 타입
+interface ImageGenerationState {
+  show: boolean;
+  historyId: string | number;
+  title: string;
+  status: 'generating' | 'completed' | 'error';
+  imageUrl?: string;
+  s3Key?: string;
+  errorMessage?: string;
+}
 
 interface GrimoireProps {
   content: HistoryEventUI[];
@@ -23,6 +35,7 @@ export const Grimoire: React.FC<GrimoireProps> = ({ content, isLoading, onFlip, 
   const [isBookReady, setIsBookReady] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<{ show: boolean; itemId: string | number; title: string } | null>(null);
   const [currentPage, setCurrentPage] = useState(0);
+  const [imageGeneration, setImageGeneration] = useState<ImageGenerationState | null>(null);
 
   // 반응형 크기 계산
   const bookDimensions = useMemo(() => {
@@ -180,6 +193,55 @@ export const Grimoire: React.FC<GrimoireProps> = ({ content, isLoading, onFlip, 
     e.preventDefault();
     setDeleteConfirm({ show: true, itemId, title });
   }, []);
+
+  // AI 이미지 생성 시작
+  const handleGenerateImage = useCallback(async (historyId: string | number, title: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    
+    setImageGeneration({
+      show: true,
+      historyId,
+      title,
+      status: 'generating',
+    });
+
+    try {
+      const response = await imageGeneratorApi.generateImageForHistory(historyId);
+      
+      if (response.success && response.data) {
+        setImageGeneration(prev => prev ? {
+          ...prev,
+          status: 'completed',
+          imageUrl: response.data.imageUrl,
+          s3Key: response.data.s3Key,
+        } : null);
+      } else {
+        throw new Error(response.error || '이미지 생성에 실패했습니다.');
+      }
+    } catch (error) {
+      console.error('AI 이미지 생성 오류:', error);
+      setImageGeneration(prev => prev ? {
+        ...prev,
+        status: 'error',
+        errorMessage: error instanceof Error ? error.message : '이미지 생성 중 오류가 발생했습니다.',
+      } : null);
+    }
+  }, []);
+
+  // 생성된 이미지를 히스토리에 추가
+  const handleAddImageToHistory = useCallback(async () => {
+    if (!imageGeneration?.s3Key || !imageGeneration?.historyId) return;
+
+    try {
+      await journalApi.updateHistoryS3Key(imageGeneration.historyId.toString(), imageGeneration.s3Key);
+      setImageGeneration(null);
+      onDataChange?.();
+    } catch (error) {
+      console.error('이미지 추가 오류:', error);
+      alert('이미지 추가 중 오류가 발생했습니다.');
+    }
+  }, [imageGeneration, onDataChange]);
 
   // 전체 페이지 배열을 하나의 useMemo로 통합
   const allPages = useMemo(() => {
@@ -355,7 +417,8 @@ export const Grimoire: React.FC<GrimoireProps> = ({ content, isLoading, onFlip, 
       const rightPageNum = 4 + (index * 2);
 
       // 이미지 URL - parsed.image_url 사용 (historyDB에서 s3_key를 여기에 매핑함)
-      const imageUrl = item.parsed.image_url || 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="300" height="400"%3E%3Crect width="300" height="400" fill="%23f4e4bc"/%3E%3Ctext x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" font-family="serif" font-size="20" fill="%238b5a2b"%3E이미지 없음%3C/text%3E%3C/svg%3E';
+      const imageUrl = item.parsed.image_url;
+      const hasImage = !!imageUrl;
       
       console.log('이미지 URL:', imageUrl, 'item:', item);
 
@@ -364,13 +427,6 @@ export const Grimoire: React.FC<GrimoireProps> = ({ content, isLoading, onFlip, 
         <Page key={`page-${leftPageNum}`} number={leftPageNum}>
           <div 
             className="h-full flex flex-col relative"
-            onClickCapture={(e) => {
-              e.stopPropagation();
-              e.preventDefault();
-            }}
-            onMouseDownCapture={(e) => {
-              e.stopPropagation();
-            }}
           >
             {/* 날짜 헤더 - 중앙 유지 */}
             <div className="flex items-center justify-center mb-2">
@@ -400,15 +456,46 @@ export const Grimoire: React.FC<GrimoireProps> = ({ content, isLoading, onFlip, 
                 <div className="absolute bottom-0 left-0 w-3 h-3 border-b-2 border-l-2 border-amber-900/40 pointer-events-none"></div>
                 <div className="absolute bottom-0 right-0 w-3 h-3 border-b-2 border-r-2 border-amber-900/40 pointer-events-none"></div>
 
-                <img
-                  src={imageUrl}
-                  alt={item.parsed.title}
-                  className="w-full h-full object-cover"
-                  style={{ filter: 'sepia(0.2) contrast(0.9)' }}
-                  onError={(e) => {
-                    e.currentTarget.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="300" height="400"%3E%3Crect width="300" height="400" fill="%23f4e4bc"/%3E%3Ctext x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" font-family="serif" font-size="20" fill="%238b5a2b"%3E이미지 없음%3C/text%3E%3C/svg%3E';
-                  }}
-                />
+                {hasImage ? (
+                  <img
+                    src={imageUrl}
+                    alt={item.parsed.title}
+                    className="w-full h-full object-cover"
+                    style={{ filter: 'sepia(0.2) contrast(0.9)' }}
+                    onError={(e) => {
+                      // 이미지 로드 실패 시 버튼으로 대체
+                      const parent = e.currentTarget.parentElement;
+                      if (parent) {
+                        e.currentTarget.style.display = 'none';
+                      }
+                    }}
+                  />
+                ) : (
+                  <div className="w-full h-full flex flex-col items-center justify-center bg-amber-50/50">
+                    <button
+                      onClickCapture={(e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        console.log('AI 이미지 생성 버튼 클릭:', item.id, item.parsed.title);
+                        handleGenerateImage(item.id, item.parsed.title, e);
+                      }}
+                      onMouseDownCapture={(e) => {
+                        e.stopPropagation();
+                      }}
+                      className="flex flex-col items-center gap-3 p-6 rounded-lg bg-amber-100/80 hover:bg-amber-200/80 border-2 border-amber-700/30 hover:border-amber-700/50 transition-all group cursor-pointer z-50"
+                    >
+                      <div className="p-3 rounded-full bg-amber-700/10 group-hover:bg-amber-700/20 transition-colors">
+                        <Sparkles className="w-8 h-8 text-amber-700" />
+                      </div>
+                      <span className="font-serif text-amber-900 font-bold text-sm">
+                        AI로 이미지 생성
+                      </span>
+                      <span className="font-serif text-amber-700/70 text-xs">
+                        클릭하여 이미지 만들기
+                      </span>
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -558,6 +645,135 @@ export const Grimoire: React.FC<GrimoireProps> = ({ content, isLoading, onFlip, 
                 >
                   삭제
                 </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* AI 이미지 생성 팝업 */}
+      {imageGeneration?.show && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center"
+          style={{ background: 'rgba(0, 0, 0, 0.7)' }}
+          onClick={() => imageGeneration.status !== 'generating' && setImageGeneration(null)}
+        >
+          <div 
+            className="relative bg-amber-50 border-4 border-amber-900/40 rounded-lg shadow-2xl max-w-md mx-4 overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: 'linear-gradient(to bottom, #f9f3e3 0%, #f4e4bc 50%, #ead6a4 100%)',
+              minWidth: '360px',
+            }}
+          >
+            {/* 장식 테두리 */}
+            <div className="absolute inset-3 border-2 border-double border-amber-900/20 rounded pointer-events-none"></div>
+            
+            {/* 종이 텍스처 */}
+            <div
+              className="absolute inset-0 opacity-30 pointer-events-none"
+              style={{
+                backgroundImage: 'url("https://www.transparenttextures.com/patterns/paper.png")',
+              }}
+            ></div>
+
+            <div className="relative z-10 p-8">
+              {/* 제목 */}
+              <div className="text-center mb-6">
+                <div className={`inline-block p-3 rounded-full mb-4 ${
+                  imageGeneration.status === 'generating' ? 'bg-amber-700/10' :
+                  imageGeneration.status === 'completed' ? 'bg-green-700/10' : 'bg-red-900/10'
+                }`}>
+                  {imageGeneration.status === 'generating' ? (
+                    <Sparkles className="w-8 h-8 text-amber-700 animate-pulse" />
+                  ) : imageGeneration.status === 'completed' ? (
+                    <ImagePlus className="w-8 h-8 text-green-700" />
+                  ) : (
+                    <X className="w-8 h-8 text-red-900" />
+                  )}
+                </div>
+                <h3 className="font-serif text-2xl text-amber-950 font-bold mb-2">
+                  {imageGeneration.status === 'generating' ? 'AI로 이미지 생성중' :
+                   imageGeneration.status === 'completed' ? '이미지 생성 완료' : '이미지 생성 실패'}
+                </h3>
+                <div className="w-24 h-[2px] bg-gradient-to-r from-transparent via-amber-900/40 to-transparent mx-auto"></div>
+              </div>
+
+              {/* 내용 */}
+              <div className="text-center mb-6">
+                <p className="font-serif text-sm text-amber-700 mb-3">
+                  "{imageGeneration.title}"
+                </p>
+
+                {imageGeneration.status === 'generating' && (
+                  <div className="flex flex-col items-center gap-4">
+                    <Loader2 className="w-12 h-12 text-amber-700 animate-spin" />
+                    <p className="font-serif text-amber-900 text-sm">
+                      AI가 일기 내용을 분석하여 이미지를 생성하고 있습니다...
+                    </p>
+                    <p className="font-serif text-amber-700/70 text-xs">
+                      약 10-30초 정도 소요됩니다
+                    </p>
+                  </div>
+                )}
+
+                {imageGeneration.status === 'completed' && imageGeneration.imageUrl && (
+                  <div className="flex flex-col items-center gap-4">
+                    <div className="relative w-full max-w-[280px] aspect-square rounded-lg overflow-hidden border-2 border-amber-900/30 shadow-lg">
+                      <img
+                        src={imageGeneration.imageUrl}
+                        alt="생성된 이미지"
+                        className="w-full h-full object-cover"
+                        style={{ filter: 'sepia(0.1) contrast(0.95)' }}
+                      />
+                    </div>
+                    <p className="font-serif text-green-800 text-sm">
+                      이미지가 성공적으로 생성되었습니다!
+                    </p>
+                  </div>
+                )}
+
+                {imageGeneration.status === 'error' && (
+                  <div className="flex flex-col items-center gap-4">
+                    <p className="font-serif text-red-900 text-sm">
+                      {imageGeneration.errorMessage || '이미지 생성 중 오류가 발생했습니다.'}
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* 버튼 */}
+              <div className="flex gap-3">
+                {imageGeneration.status === 'generating' ? (
+                  <button
+                    disabled
+                    className="flex-1 px-6 py-3 bg-amber-900/20 text-amber-700 font-serif rounded border-2 border-amber-900/30 cursor-not-allowed"
+                  >
+                    생성 중...
+                  </button>
+                ) : imageGeneration.status === 'completed' ? (
+                  <>
+                    <button
+                      onClick={() => setImageGeneration(null)}
+                      className="flex-1 px-6 py-3 bg-amber-900/10 hover:bg-amber-900/20 text-amber-950 font-serif rounded border-2 border-amber-900/30 transition-all hover:scale-105"
+                    >
+                      취소
+                    </button>
+                    <button
+                      onClick={handleAddImageToHistory}
+                      className="flex-1 px-6 py-3 bg-amber-700 hover:bg-amber-600 text-amber-50 font-serif font-bold rounded border-2 border-amber-800 transition-all hover:scale-105 shadow-lg"
+                    >
+                      히스토리에 추가
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    onClick={() => setImageGeneration(null)}
+                    className="flex-1 px-6 py-3 bg-amber-900/10 hover:bg-amber-900/20 text-amber-950 font-serif rounded border-2 border-amber-900/30 transition-all hover:scale-105"
+                  >
+                    닫기
+                  </button>
+                )}
               </div>
             </div>
           </div>

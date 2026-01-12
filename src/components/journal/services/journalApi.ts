@@ -258,6 +258,19 @@ export class JournalApiService {
     return await response.json();
   }
 
+  // S3 키 업데이트 (이미지 URL 저장)
+  async updateHistoryS3Key(historyId: string, s3Key: string): Promise<any> {
+    const response = await fetch(`${this.apiBaseUrl}/history/${historyId}/s3-key?s3_key=${encodeURIComponent(s3Key)}`, {
+      method: 'PATCH',
+    });
+    
+    if (!response.ok) {
+      throw new Error(`S3 키 업데이트 실패: ${response.status}`);
+    }
+    
+    return await response.json();
+  }
+
   // S3 키로 파일 URL 가져오기 (Library API 사용)
   async getFileUrlFromS3Key(s3Key: string): Promise<string | null> {
     try {
