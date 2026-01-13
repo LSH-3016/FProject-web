@@ -143,6 +143,7 @@ export const JournalBook = () => {
     summaryResult,
     summaryError,
     loadingMessage,
+    temperature,
     isOverwriteDialogOpen,
     setIsOverwriteDialogOpen,
     existingHistoryDate,
@@ -159,7 +160,8 @@ export const JournalBook = () => {
     checkAndSaveToHistory,
     performSaveToHistory,
     handleImageSelect,
-    handleRemoveImage
+    handleRemoveImage,
+    setTemperature
   } = useJournalSummary(currentUserId, API_BASE_URL, LIBRARY_API_URL);
 
   const {
@@ -385,6 +387,8 @@ export const JournalBook = () => {
         existingS3Key={existingS3Key}
         existingImageUrl={existingImageUrl}
         isCheckingS3Key={isCheckingS3Key}
+        temperature={temperature}
+        onTemperatureChange={setTemperature}
         onProceedToResult={proceedToResult}
         onSaveToHistory={checkAndSaveToHistory}
         onImageSelect={handleImageSelect}

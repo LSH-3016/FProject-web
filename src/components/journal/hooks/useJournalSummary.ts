@@ -9,6 +9,7 @@ export const useJournalSummary = (userId: string, apiBaseUrl: string, libraryApi
   const [summaryResult, setSummaryResult] = useState<SummaryResult | null>(null);
   const [summaryError, setSummaryError] = useState<string | null>(null);
   const [loadingMessage, setLoadingMessage] = useState<string>("AI가 기록을 분석하고 있어요...");
+  const [temperature, setTemperature] = useState<number>(0.5); // 기본값 0.5
   
   // 히스토리 관련 상태
   const [isOverwriteDialogOpen, setIsOverwriteDialogOpen] = useState(false);
@@ -89,7 +90,7 @@ export const useJournalSummary = (userId: string, apiBaseUrl: string, libraryApi
       const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
       console.log('요약 API 호출 - 날짜 (로컬):', todayStr, '사용자:', userId);
       
-      const result = await summarizeJournalEntries(userId, apiBaseUrl, todayStr);
+      const result = await summarizeJournalEntries(userId, apiBaseUrl, todayStr, temperature);
       
       setLoadingMessage("요약을 완성하는 중...");
       await new Promise(resolve => setTimeout(resolve, 300));
@@ -325,6 +326,7 @@ export const useJournalSummary = (userId: string, apiBaseUrl: string, libraryApi
     summaryResult,
     summaryError,
     loadingMessage,
+    temperature,
     isOverwriteDialogOpen,
     setIsOverwriteDialogOpen,
     existingHistoryDate,
@@ -343,6 +345,7 @@ export const useJournalSummary = (userId: string, apiBaseUrl: string, libraryApi
     checkAndSaveToHistory,
     performSaveToHistory,
     handleImageSelect,
-    handleRemoveImage
+    handleRemoveImage,
+    setTemperature
   };
 };

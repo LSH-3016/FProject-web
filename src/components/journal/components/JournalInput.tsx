@@ -16,6 +16,8 @@ export const JournalInput = ({ onSubmit, isSaving }: JournalInputProps) => {
   const streamRef = useRef<MediaStream | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const processorRef = useRef<ScriptProcessorNode | null>(null);
+  const lastResultRef = useRef<string>("");  // 마지막 결과 추적
+  const confirmedTextRef = useRef<string>("");  // 확정된 텍스트
 
   // 컴포넌트 언마운트 시 정리
   useEffect(() => {
@@ -38,6 +40,8 @@ export const JournalInput = ({ onSubmit, isSaving }: JournalInputProps) => {
     try {
       await onSubmit(currentEntry);
       setCurrentEntry("");
+      confirmedTextRef.current = "";
+      lastResultRef.current = "";
     } catch (error) {
       console.error("입력 처리 실패:", error);
     }
@@ -74,7 +78,7 @@ export const JournalInput = ({ onSubmit, isSaving }: JournalInputProps) => {
         audioContextRef.current = audioContext;
         
         const source = audioContext.createMediaStreamSource(stream);
-        const processor = audioContext.createScriptProcessor(4096, 1, 1);
+        const processor = audioContext.createScriptProcessor(2048, 1, 1);  // 4096 → 2048로 줄여서 딜레이 감소
         processorRef.current = processor;
         
         processor.onaudioprocess = (e) => {
@@ -98,11 +102,23 @@ export const JournalInput = ({ onSubmit, isSaving }: JournalInputProps) => {
         try {
           const result = JSON.parse(event.data);
           if (result.text) {
-            console.log('📝 STT 결과:', result.text);
-            setCurrentEntry(prev => {
-              const separator = prev.trim() ? ' ' : '';
-              return prev + separator + result.text;
-            });
+            const newText = result.text.trim();
+            const lastText = lastResultRef.current;
+            
+            console.log(`📝 STT 결과: "${newText}" (이전: "${lastText}")`);
+            
+            // 새 텍스트가 이전 텍스트를 포함하면 → 같은 문장 업데이트 (덮어쓰기)
+            // 새 텍스트가 이전 텍스트를 포함하지 않으면 → 새 문장 시작 (이전 문장 확정)
+            if (newText.includes(lastText) || lastText.includes(newText) || lastText === "") {
+              // 같은 문장 업데이트 - 덮어쓰기
+              lastResultRef.current = newText;
+              setCurrentEntry(confirmedTextRef.current + (confirmedTextRef.current ? ' ' : '') + newText);
+            } else {
+              // 새 문장 시작 - 이전 문장 확정
+              confirmedTextRef.current = confirmedTextRef.current + (confirmedTextRef.current ? ' ' : '') + lastText;
+              lastResultRef.current = newText;
+              setCurrentEntry(confirmedTextRef.current + ' ' + newText);
+            }
           }
           if (result.error) {
             console.error('STT 오류:', result.error);
@@ -135,6 +151,13 @@ export const JournalInput = ({ onSubmit, isSaving }: JournalInputProps) => {
   };
 
   const stopRecording = () => {
+    // 마지막 결과 확정
+    if (lastResultRef.current) {
+      confirmedTextRef.current = confirmedTextRef.current + (confirmedTextRef.current ? ' ' : '') + lastResultRef.current;
+      setCurrentEntry(confirmedTextRef.current);
+      lastResultRef.current = "";
+    }
+    
     // WebSocket 종료
     if (wsRef.current) {
       wsRef.current.close();
@@ -173,7 +196,11 @@ export const JournalInput = ({ onSubmit, isSaving }: JournalInputProps) => {
     <div className="relative group">
       <textarea
         value={currentEntry}
-        onChange={(e) => setCurrentEntry(e.target.value)}
+        onChange={(e) => {
+          setCurrentEntry(e.target.value);
+          confirmedTextRef.current = e.target.value;
+          lastResultRef.current = "";
+        }}
         onKeyDown={handleKeyDown}
         placeholder={isRecording ? "말씀하세요... (실시간 변환 중)" : "이곳에 오늘 있었던 일을 적어보세요..."}
         className="w-full h-13 px-4 py-3 pr-24 rounded-xl bg-secondary/20 border border-input focus:border-primary focus:ring-1 focus:ring-primary/20 resize-none text-foreground placeholder:text-muted-foreground/50 outline-none transition-all duration-300 font-serif"

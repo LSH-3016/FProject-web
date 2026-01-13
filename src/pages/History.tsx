@@ -366,7 +366,7 @@ const History = () => {
       <div className="flex-1 flex flex-col items-center overflow-hidden">
 
       {/* 상단 검색바 영역 */}
-      <div className="z-20 w-full max-w-2xl px-4 py-2 mt-1 flex flex-col items-center gap-2 flex-shrink-0">
+      <div className="w-full max-w-2xl px-4 py-2 mt-1 flex flex-col items-center gap-2 flex-shrink-0">
         {/* 중복 경고 메시지 (사이드바가 닫혔을 때만) */}
         {duplicateWarning && !showSidebar && (
           <div className="w-full bg-amber-900/20 border border-amber-700/50 text-amber-200 px-4 py-2 rounded-lg text-sm font-serif flex items-center justify-between animate-pulse">
@@ -542,7 +542,7 @@ const History = () => {
             {historyContent && historyContent.length > 0 && (
               <button
                 onClick={clearHistory}
-                className="text-amber-900/40 hover:text-red-900/60 transition-colors text-xs flex items-center gap-1 font-serif"
+                className="text-amber-900/60 hover:text-red-900 bg-amber-100/80 hover:bg-red-100 px-2 py-1 rounded transition-colors text-xs flex items-center gap-1 font-serif"
                 title="Burn Book (Reset)"
               >
                 <Trash2 className="w-3 h-3" />
@@ -553,7 +553,7 @@ const History = () => {
       </div>
 
       {/* 메인 책 디스플레이 영역 */}
-      <main className="flex-1 w-full flex items-center justify-center px-4 z-10 overflow-hidden">
+      <main className="flex-1 w-full flex items-center justify-center px-4 overflow-hidden">
         <ErrorBoundary>
           {appState === AppState.ERROR ? (
             <div className="text-center text-red-900 bg-[#f3e5ab] p-8 rounded shadow-lg font-serif border border-red-800 max-w-md mx-4">
@@ -579,7 +579,7 @@ const History = () => {
         </ErrorBoundary>
       </main>
 
-      <footer className="w-full text-center py-1 text-amber-900/20 font-serif text-[9px] tracking-widest z-20 uppercase flex-shrink-0">
+      <footer className="w-full text-center py-1 text-amber-900/20 font-serif text-[9px] tracking-widest uppercase flex-shrink-0">
         M M X X V  ·  G R I M O I R E
       </footer>
       </div>

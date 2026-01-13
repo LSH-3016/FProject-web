@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { HelpCircle, Loader2, Sparkles, Image, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -23,6 +23,8 @@ interface SummaryDialogProps {
   existingS3Key: string | null;
   existingImageUrl: string | null;
   isCheckingS3Key: boolean;
+  temperature: number;
+  onTemperatureChange: (value: number) => void;
   onProceedToResult: () => void;
   onSaveToHistory: () => void;
   onImageSelect: (event: React.ChangeEvent<HTMLInputElement>) => void;
@@ -41,6 +43,8 @@ export const SummaryDialog = ({
   existingS3Key,
   existingImageUrl,
   isCheckingS3Key,
+  temperature,
+  onTemperatureChange,
   onProceedToResult,
   onSaveToHistory,
   onImageSelect,
@@ -100,6 +104,38 @@ export const SummaryDialog = ({
                 )}
               </DialogDescription>
             </DialogHeader>
+            
+            {/* Temperature 슬라이더 */}
+            <div className="space-y-3 py-4">
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-medium text-foreground">
+                  창의성 조절 (Temperature)
+                </label>
+                <span className="text-sm font-mono text-muted-foreground bg-muted px-2 py-1 rounded">
+                  {temperature.toFixed(1)}
+                </span>
+              </div>
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.1"
+                value={temperature}
+                onChange={(e) => onTemperatureChange(parseFloat(e.target.value))}
+                className="w-full h-2 bg-muted rounded-lg appearance-none cursor-pointer accent-primary"
+              />
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span>일관적 (0.0)</span>
+                <span>균형 (0.5)</span>
+                <span>창의적 (1.0)</span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {temperature < 0.4 ? '더 일관되고 정확한 요약을 생성합니다.' :
+                 temperature > 0.6 ? '더 창의적이고 다양한 표현을 사용합니다.' :
+                 '일관성과 창의성의 균형을 맞춥니다.'}
+              </p>
+            </div>
+            
             <DialogFooter className="gap-2 sm:gap-0 mt-4">
               <Button variant="outline" onClick={onClose} className="border-primary/20 hover:bg-primary/5 hover:text-primary">
                 아니요, 더 쓸래요

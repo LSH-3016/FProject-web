@@ -18,6 +18,33 @@ export interface GenerateImageResponse {
   error?: string;
 }
 
+export interface PreviewImageResponse {
+  success: boolean;
+  data: {
+    historyId: number;
+    userId: string;
+    imageBase64: string;
+    prompt: {
+      positive: string;
+      negative: string;
+    };
+  };
+  error?: string;
+}
+
+export interface ConfirmImageResponse {
+  success: boolean;
+  data: {
+    historyId: number;
+    userId: string;
+    s3Key: string;
+    textKey: string;
+    imageUrl: string;
+    textUrl: string;
+  };
+  error?: string;
+}
+
 export interface DirectGenerateImageResponse {
   success: boolean;
   data: {
@@ -52,7 +79,7 @@ class ImageGeneratorApiService {
     };
   }
 
-  // 특정 History에 이미지 생성
+  // 특정 History에 이미지 생성 (바로 S3/DB 저장)
   async generateImageForHistory(historyId: number | string): Promise<GenerateImageResponse> {
     const response = await fetch(`${IMAGE_GENERATOR_API_URL}/api/v1/histories/${historyId}/generate-image`, {
       method: 'POST',
@@ -62,6 +89,37 @@ class ImageGeneratorApiService {
     if (!response.ok) {
       const error = await response.json().catch(() => ({ error: '이미지 생성 실패' }));
       throw new Error(error.error || `이미지 생성 실패: ${response.status}`);
+    }
+
+    return response.json();
+  }
+
+  // 이미지 미리보기 생성 (S3/DB 저장 안 함)
+  async previewImageForHistory(historyId: number | string): Promise<PreviewImageResponse> {
+    const response = await fetch(`${IMAGE_GENERATOR_API_URL}/api/v1/histories/${historyId}/preview-image`, {
+      method: 'POST',
+      headers: this.getAuthHeaders(),
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: '이미지 미리보기 생성 실패' }));
+      throw new Error(error.error || `이미지 미리보기 생성 실패: ${response.status}`);
+    }
+
+    return response.json();
+  }
+
+  // 이미지 확정 저장 (S3/DB에 저장)
+  async confirmImageForHistory(historyId: number | string, imageBase64: string): Promise<ConfirmImageResponse> {
+    const response = await fetch(`${IMAGE_GENERATOR_API_URL}/api/v1/histories/${historyId}/confirm-image`, {
+      method: 'POST',
+      headers: this.getAuthHeaders(),
+      body: JSON.stringify({ imageBase64 }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: '이미지 저장 실패' }));
+      throw new Error(error.error || `이미지 저장 실패: ${response.status}`);
     }
 
     return response.json();
