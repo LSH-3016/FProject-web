@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { BookOpen, History, Library, User, Settings, LogOut, X, Home, BookMarked } from "lucide-react";
+import { BookOpen, History, Library, User, Settings, LogOut, X, BookMarked, FileText } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "@/hooks/use-toast";
@@ -17,6 +17,7 @@ const topMenuItems: MenuItem[] = [
   { id: "journal", label: "기록실", icon: BookOpen, path: "/journal" },
   { id: "history", label: "히스토리", icon: History, path: "/history" },
   { id: "library", label: "라이브러리", icon: Library, path: "/library" },
+  { id: "report", label: "리포트", icon: FileText, path: "/report" },
 ];
 
 // path를 특수 식별자로 변경
@@ -27,7 +28,7 @@ const bottomRowItems: MenuItem[] = [
   { id: "settings", label: "설정", icon: Settings, path: "/settings" },
 ];
 
-const mainItem: MenuItem = { id: "main", label: "메인 페이지", icon: Home, path: "/" };
+
 
 // 2. 컴포넌트
 interface LibrarySidebarProps {

@@ -17,6 +17,7 @@ import { LibraryProvider } from "./contexts/LibraryContext";
 import MyPage from "./pages/MyPage";
 import EditProfile from "./pages/EditProfile";
 import Settings from "./pages/Settings";
+import Report from "./pages/Report";
 import NotFound from "./pages/NotFound";
 
 // 인증 관련 컴포넌트
@@ -112,6 +113,15 @@ const App = () => {
             element={
               <ProtectedRoute>
                 <Settings />
+              </ProtectedRoute>
+            } 
+          />
+          
+          <Route 
+            path="/report" 
+            element={
+              <ProtectedRoute>
+                <Report />
               </ProtectedRoute>
             } 
           />
