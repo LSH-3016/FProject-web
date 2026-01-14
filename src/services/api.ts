@@ -3,7 +3,7 @@
 
 import { LibraryItem, LibraryItemType, LibraryItemVisibility } from "@/types/library";
 
-const API_BASE_URL = import.meta.env.VITE_LIBRARY_API_URL || "http://192.168.0.138:8000/api/v1";
+const API_BASE_URL = `${import.meta.env.VITE_API_URL || "https://api.aws11.shop"}${import.meta.env.LIBRARY_API_PREFIX || "/library"}`;
 
 // API 응답 타입
 interface ApiResponse<T> {
@@ -96,7 +96,14 @@ class ApiService {
       }
 
       const result = await response.json();
-      return result.data?.file_url || result.file_url || null;
+      const fileUrl = result.data?.file_url || result.file_url || null;
+      
+      // 백엔드가 잘못된 도메인으로 URL을 생성하는 경우 수정
+      if (fileUrl) {
+        return fileUrl.replace('https://library.aws11.shop/api/v1', `${import.meta.env.VITE_API_URL || "https://api.aws11.shop"}${import.meta.env.LIBRARY_API_PREFIX || "/library"}`);
+      }
+      
+      return null;
     } catch (error) {
       console.error('S3 URL 조회 중 오류:', error);
       return null;
@@ -326,12 +333,18 @@ class ApiService {
   }
 
   private mapLibraryItem(item: ApiLibraryItem): LibraryItem {
+    // 백엔드가 잘못된 도메인으로 URL을 생성하는 경우 수정
+    const fixUrl = (url: string | null | undefined): string | undefined => {
+      if (!url) return undefined;
+      return url.replace('https://library.aws11.shop/api/v1', `${import.meta.env.VITE_API_URL || "https://api.aws11.shop"}${import.meta.env.LIBRARY_API_PREFIX || "/library"}`);
+    };
+
     return {
       id: item.id,
       name: item.name,
       type: item.type,
       visibility: item.visibility,
-      thumbnail: item.thumbnail_url || item.file_url || undefined,
+      thumbnail: fixUrl(item.thumbnail_url) || fixUrl(item.file_url) || undefined,
       preview: item.preview_text || undefined,
       createdAt: new Date(item.created_at),
       size: item.file_size,

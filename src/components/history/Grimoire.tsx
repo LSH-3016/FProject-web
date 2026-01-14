@@ -6,7 +6,7 @@ import { ChevronLeft, ChevronRight, Loader2, BookOpen, X, Sparkles, ImagePlus, T
 import { JournalApiService } from '@/components/journal/services/journalApi';
 import { imageGeneratorApi } from '@/services/imageGeneratorApi';
 
-const API_BASE_URL = import.meta.env.VITE_JOURNAL_API_URL || 'http://localhost:8000';
+const API_BASE_URL = `${import.meta.env.VITE_API_URL || "https://api.aws11.shop"}${import.meta.env.JOURNAL_API_PREFIX || "/journal"}`;
 const journalApi = new JournalApiService(API_BASE_URL);
 
 // AI 이미지 생성 팝업 상태 타입

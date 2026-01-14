@@ -45,8 +45,8 @@ export const JournalBook = () => {
   const currentUserId = userId; // useCurrentUser 훅에서 가져온 userId 사용
   // 닉네임 우선순위: API 닉네임 > Cognito 닉네임 > 이름 > displayName
   const finalDisplayName = isLoadingProfile ? "사용자" : (profileNickname || nickname || name || displayName);
-  const API_BASE_URL = import.meta.env.VITE_JOURNAL_API_URL || "http://localhost:8000";
-  const LIBRARY_API_URL = import.meta.env.VITE_LIBRARY_API_URL || "http://192.168.0.138:8000/api/v1";
+  const API_BASE_URL = `${import.meta.env.VITE_API_URL || "https://api.aws11.shop"}${import.meta.env.JOURNAL_API_PREFIX || "/journal"}`;
+  const LIBRARY_API_URL = `${import.meta.env.VITE_API_URL || "https://api.aws11.shop"}${import.meta.env.LIBRARY_API_PREFIX || "/library"}`;
 
   // 프로필 정보 로드
   useEffect(() => {
@@ -75,7 +75,8 @@ export const JournalBook = () => {
           return;
         }
 
-        const response = await fetch(`${import.meta.env.VITE_COGNITO_API_URL}/api/user/profile`, {
+        const authApiUrl = `${import.meta.env.VITE_API_URL || "https://api.aws11.shop"}${import.meta.env.AUTH_API_PREFIX || "/auth"}`;
+        const response = await fetch(`${authApiUrl}/user/profile`, {
           headers: {
             'Authorization': `Bearer ${token}`,
           },

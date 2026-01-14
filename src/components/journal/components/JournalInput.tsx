@@ -63,9 +63,9 @@ export const JournalInput = ({ onSubmit, isSaving }: JournalInputProps) => {
       streamRef.current = stream;
 
       // WebSocket 연결
-      const sttApiUrl = import.meta.env.VITE_STT_API_URL || 'https://stt.aws11.shop';
+      const sttApiUrl = `${import.meta.env.VITE_API_URL || "https://api.aws11.shop"}${import.meta.env.STT_API_PREFIX || "/stt"}`;
       const wsUrl = sttApiUrl.replace('https://', 'wss://').replace('http://', 'ws://');
-      const ws = new WebSocket(`${wsUrl}/stt/stream`);
+      const ws = new WebSocket(`${wsUrl}/stream`);
       wsRef.current = ws;
 
       ws.onopen = () => {

@@ -25,7 +25,7 @@ export class UserService {
   private apiBaseUrl: string;
 
   constructor(apiBaseUrl?: string) {
-    this.apiBaseUrl = apiBaseUrl || import.meta.env.VITE_COGNITO_API_URL || 'http://localhost:3001';
+    this.apiBaseUrl = apiBaseUrl || `${import.meta.env.VITE_API_URL || "https://api.aws11.shop"}${import.meta.env.AUTH_API_PREFIX || "/auth"}`;
   }
 
   /**

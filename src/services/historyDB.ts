@@ -3,7 +3,7 @@ import { JournalApiService } from '@/components/journal/services/journalApi';
 import { apiService } from '@/services/api';
 
 // API 기본 URL - Journal API와 동일한 URL 사용
-const API_BASE_URL = import.meta.env.VITE_JOURNAL_API_URL || 'http://localhost:8000';
+const API_BASE_URL = `${import.meta.env.VITE_API_URL || "https://api.aws11.shop"}${import.meta.env.JOURNAL_API_PREFIX || "/journal"}`;
 
 // JournalApiService 인스턴스 생성
 const journalApi = new JournalApiService(API_BASE_URL);
@@ -79,7 +79,8 @@ async function parseHistoryContent(event: HistoryEvent): Promise<ParsedHistoryCo
   let imageUrl: string | undefined = undefined;
   
   if (event.file_url) {
-    imageUrl = event.file_url;
+    // 백엔드가 잘못된 도메인으로 URL을 생성하는 경우 수정
+    imageUrl = event.file_url.replace('https://library.aws11.shop/api/v1', `${import.meta.env.VITE_API_URL || "https://api.aws11.shop"}${import.meta.env.LIBRARY_API_PREFIX || "/library"}`);
   } else if (event.s3_key) {
     // Library API의 url-by-key 엔드포인트 사용
     const url = await apiService.getFileUrlFromS3Key(event.s3_key);

@@ -98,7 +98,8 @@ const EditProfile = () => {
         }
 
         // API에서 프로필 정보 가져오기
-        const response = await fetch(`${import.meta.env.VITE_COGNITO_API_URL}/api/user/profile`, {
+        const authApiUrl = `${import.meta.env.VITE_API_URL || "https://api.aws11.shop"}${import.meta.env.AUTH_API_PREFIX || "/auth"}`;
+        const response = await fetch(`${authApiUrl}/user/profile`, {
           headers: {
             'Authorization': `Bearer ${token}`,
           },
@@ -241,7 +242,8 @@ const EditProfile = () => {
         const formData = new FormData();
         formData.append('image', profileFile);
 
-        const imageUrl = `${import.meta.env.VITE_COGNITO_API_URL}/api/user/profile/image`;
+        const authApiUrl = `${import.meta.env.VITE_API_URL || "https://api.aws11.shop"}${import.meta.env.AUTH_API_PREFIX || "/auth"}`;
+        const imageUrl = `${authApiUrl}/user/profile/image`;
         console.log('📤 이미지 업로드 URL:', imageUrl);
 
         const imageResponse = await fetch(imageUrl, {
@@ -302,7 +304,8 @@ const EditProfile = () => {
 
       // Only update if there are changes
       if (Object.keys(updates).length > 0) {
-        const profileUrl = `${import.meta.env.VITE_COGNITO_API_URL}/api/user/profile`;
+        const authApiUrl = `${import.meta.env.VITE_API_URL || "https://api.aws11.shop"}${import.meta.env.AUTH_API_PREFIX || "/auth"}`;
+        const profileUrl = `${authApiUrl}/user/profile`;
         console.log('📝 프로필 업데이트 URL:', profileUrl);
 
         const response = await fetch(profileUrl, {

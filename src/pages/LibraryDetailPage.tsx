@@ -84,7 +84,8 @@ const LibraryDetailPage = () => {
           return;
         }
 
-        const response = await fetch(`${import.meta.env.VITE_COGNITO_API_URL}/api/user/profile`, {
+        const authApiUrl = `${import.meta.env.VITE_API_URL || "https://api.aws11.shop"}${import.meta.env.AUTH_API_PREFIX || "/auth"}`;
+        const response = await fetch(`${authApiUrl}/user/profile`, {
           headers: {
             'Authorization': `Bearer ${token}`,
           },

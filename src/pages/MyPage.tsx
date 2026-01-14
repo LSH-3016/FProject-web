@@ -189,7 +189,8 @@ const MyPage = () => {
           return;
         }
 
-        const response = await fetch(`${import.meta.env.VITE_COGNITO_API_URL}/api/user/profile`, {
+        const authApiUrl = `${import.meta.env.VITE_API_URL || "https://api.aws11.shop"}${import.meta.env.AUTH_API_PREFIX || "/auth"}`;
+        const response = await fetch(`${authApiUrl}/user/profile`, {
           headers: {
             'Authorization': `Bearer ${token}`,
           },
@@ -227,7 +228,8 @@ const MyPage = () => {
       if (!token) return;
 
       try {
-        const response = await fetch(`${import.meta.env.VITE_COGNITO_API_URL}/api/user/profile`, {
+        const authApiUrl = `${import.meta.env.VITE_API_URL || "https://api.aws11.shop"}${import.meta.env.AUTH_API_PREFIX || "/auth"}`;
+        const response = await fetch(`${authApiUrl}/user/profile`, {
           headers: {
             'Authorization': `Bearer ${token}`,
           },
@@ -283,7 +285,8 @@ const MyPage = () => {
       }
 
       // Call backend API to delete account
-      const response = await fetch(`${import.meta.env.VITE_COGNITO_API_URL}/api/user/account`, {
+      const authApiUrl = `${import.meta.env.VITE_API_URL || "https://api.aws11.shop"}${import.meta.env.AUTH_API_PREFIX || "/auth"}`;
+      const response = await fetch(`${authApiUrl}/user/account`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -399,7 +402,8 @@ const MyPage = () => {
         return;
       }
 
-      const response = await fetch(`${import.meta.env.VITE_COGNITO_API_URL}/api/user/report`, {
+      const authApiUrl = `${import.meta.env.VITE_API_URL || "https://api.aws11.shop"}${import.meta.env.AUTH_API_PREFIX || "/auth"}`;
+      const response = await fetch(`${authApiUrl}/user/report`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -475,7 +479,8 @@ const MyPage = () => {
         return;
       }
 
-      const response = await fetch(`${import.meta.env.VITE_COGNITO_API_URL}/api/user/inquiry`, {
+      const authApiUrl = `${import.meta.env.VITE_API_URL || "https://api.aws11.shop"}${import.meta.env.AUTH_API_PREFIX || "/auth"}`;
+      const response = await fetch(`${authApiUrl}/user/inquiry`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -562,7 +567,8 @@ const MyPage = () => {
       }
 
       // 비밀번호 재설정 코드를 이메일로 전송
-      const response = await fetch(`${import.meta.env.VITE_COGNITO_API_URL}/api/user/password-reset`, {
+      const authApiUrl = `${import.meta.env.VITE_API_URL || "https://api.aws11.shop"}${import.meta.env.AUTH_API_PREFIX || "/auth"}`;
+      const response = await fetch(`${authApiUrl}/user/password-reset`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -630,7 +636,8 @@ const MyPage = () => {
       }
 
       // 인증 코드로 비밀번호 변경 확인
-      const response = await fetch(`${import.meta.env.VITE_COGNITO_API_URL}/api/user/password-reset/confirm`, {
+      const authApiUrl = `${import.meta.env.VITE_API_URL || "https://api.aws11.shop"}${import.meta.env.AUTH_API_PREFIX || "/auth"}`;
+      const response = await fetch(`${authApiUrl}/user/password-reset/confirm`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,

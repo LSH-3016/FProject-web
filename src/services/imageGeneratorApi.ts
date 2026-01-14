@@ -1,7 +1,7 @@
 // Image Generator API 서비스
 // AI 이미지 생성 API와 통신
 
-const IMAGE_GENERATOR_API_URL = import.meta.env.VITE_IMAGE_API_URL || 'https://image.aws11.shop';
+const IMAGE_GENERATOR_API_URL = `${import.meta.env.VITE_API_URL || "https://api.aws11.shop"}${import.meta.env.IMAGE_API_PREFIX || "/image"}`;
 
 export interface GenerateImageResponse {
   success: boolean;
@@ -81,7 +81,7 @@ class ImageGeneratorApiService {
 
   // 특정 History에 이미지 생성 (바로 S3/DB 저장)
   async generateImageForHistory(historyId: number | string): Promise<GenerateImageResponse> {
-    const response = await fetch(`${IMAGE_GENERATOR_API_URL}/api/v1/histories/${historyId}/generate-image`, {
+    const response = await fetch(`${IMAGE_GENERATOR_API_URL}/histories/${historyId}/generate-image`, {
       method: 'POST',
       headers: this.getAuthHeaders(),
     });
@@ -96,7 +96,7 @@ class ImageGeneratorApiService {
 
   // 이미지 미리보기 생성 (S3/DB 저장 안 함)
   async previewImageForHistory(historyId: number | string): Promise<PreviewImageResponse> {
-    const response = await fetch(`${IMAGE_GENERATOR_API_URL}/api/v1/histories/${historyId}/preview-image`, {
+    const response = await fetch(`${IMAGE_GENERATOR_API_URL}/histories/${historyId}/preview-image`, {
       method: 'POST',
       headers: this.getAuthHeaders(),
     });
@@ -111,7 +111,7 @@ class ImageGeneratorApiService {
 
   // 이미지 확정 저장 (S3/DB에 저장)
   async confirmImageForHistory(historyId: number | string, imageBase64: string): Promise<ConfirmImageResponse> {
-    const response = await fetch(`${IMAGE_GENERATOR_API_URL}/api/v1/histories/${historyId}/confirm-image`, {
+    const response = await fetch(`${IMAGE_GENERATOR_API_URL}/histories/${historyId}/confirm-image`, {
       method: 'POST',
       headers: this.getAuthHeaders(),
       body: JSON.stringify({ imageBase64 }),
@@ -127,7 +127,7 @@ class ImageGeneratorApiService {
 
   // 텍스트로 직접 이미지 생성 (S3 저장 안됨)
   async generateImageFromText(text: string): Promise<DirectGenerateImageResponse> {
-    const response = await fetch(`${IMAGE_GENERATOR_API_URL}/api/v1/generate-image`, {
+    const response = await fetch(`${IMAGE_GENERATOR_API_URL}/generate-image`, {
       method: 'POST',
       headers: this.getAuthHeaders(),
       body: JSON.stringify({ text }),
