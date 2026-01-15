@@ -3,7 +3,7 @@
 
 import { LibraryItem, LibraryItemType, LibraryItemVisibility } from "@/types/library";
 
-const API_BASE_URL = `${import.meta.env.VITE_API_URL || "https://api.aws11.shop"}${import.meta.env.LIBRARY_API_PREFIX || "/library"}`;
+const API_BASE_URL = `${import.meta.env.VITE_API_URL || "https://api.aws11.shop"}${import.meta.env.VITE_LIBRARY_API_PREFIX || "/library"}`;
 
 // API 응답 타입
 interface ApiResponse<T> {
@@ -100,7 +100,7 @@ class ApiService {
       
       // 백엔드가 잘못된 도메인으로 URL을 생성하는 경우 수정
       if (fileUrl) {
-        return fileUrl.replace('https://library.aws11.shop/api/v1', `${import.meta.env.VITE_API_URL || "https://api.aws11.shop"}${import.meta.env.LIBRARY_API_PREFIX || "/library"}`);
+        return fileUrl.replace('https://library.aws11.shop/api/v1', `${import.meta.env.VITE_API_URL || "https://api.aws11.shop"}${import.meta.env.VITE_LIBRARY_API_PREFIX || "/library"}`);
       }
       
       return null;
@@ -336,7 +336,7 @@ class ApiService {
     // 백엔드가 잘못된 도메인으로 URL을 생성하는 경우 수정
     const fixUrl = (url: string | null | undefined): string | undefined => {
       if (!url) return undefined;
-      return url.replace('https://library.aws11.shop/api/v1', `${import.meta.env.VITE_API_URL || "https://api.aws11.shop"}${import.meta.env.LIBRARY_API_PREFIX || "/library"}`);
+      return url.replace('https://library.aws11.shop/api/v1', `${import.meta.env.VITE_API_URL || "https://api.aws11.shop"}${import.meta.env.VITE_LIBRARY_API_PREFIX || "/library"}`);
     };
 
     return {

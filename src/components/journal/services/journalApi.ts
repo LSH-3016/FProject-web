@@ -288,7 +288,7 @@ export class JournalApiService {
       }
       
       // Library API URL 가져오기
-      const libraryApiUrl = `${import.meta.env.VITE_API_URL || "https://api.aws11.shop"}${import.meta.env.LIBRARY_API_PREFIX || "/library"}`;
+      const libraryApiUrl = `${import.meta.env.VITE_API_URL || "https://api.aws11.shop"}${import.meta.env.VITE_LIBRARY_API_PREFIX || "/library"}`;
       const response = await fetch(`${libraryApiUrl}/library-items/url-by-key?s3_key=${encodeURIComponent(s3Key)}`, {
         headers: {
           ...(token && { 'Authorization': `Bearer ${token}` }),
@@ -305,7 +305,7 @@ export class JournalApiService {
       
       // 백엔드가 잘못된 도메인으로 URL을 생성하는 경우 수정
       if (fileUrl) {
-        return fileUrl.replace('https://library.aws11.shop/api/v1', `${import.meta.env.VITE_API_URL || "https://api.aws11.shop"}${import.meta.env.LIBRARY_API_PREFIX || "/library"}`);
+        return fileUrl.replace('https://library.aws11.shop/api/v1', `${import.meta.env.VITE_API_URL || "https://api.aws11.shop"}${import.meta.env.VITE_LIBRARY_API_PREFIX || "/library"}`);
       }
       
       return null;
