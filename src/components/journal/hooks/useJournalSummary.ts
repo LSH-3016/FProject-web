@@ -118,28 +118,37 @@ export const useJournalSummary = (userId: string, apiBaseUrl: string, libraryApi
       
       console.log('히스토리 확인 결과:', checkData);
       
+      // exists가 명시적으로 true가 아니면 신규 저장
+      if (checkData.exists !== true) {
+        console.log('히스토리 없음 (exists !== true) - 신규 저장 진행');
+        await performSaveToHistory(false, null);
+        return;
+      }
+      
+      // exists가 true인 경우에만 날짜 비교
+      if (!checkData.record_date) {
+        console.log('record_date 없음 - 신규 저장 진행');
+        await performSaveToHistory(false, null);
+        return;
+      }
+      
       // 오늘 날짜 확인
       const today = new Date();
       const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+      const recordDate = checkData.record_date.split('T')[0]; // ISO 형식에서 날짜 부분만 추출
       
-      // exists가 true이고, record_date가 존재하고, 오늘 날짜인 경우에만 덮어쓰기 다이얼로그 표시
-      if (checkData.exists === true && checkData.record_date) {
-        const recordDate = checkData.record_date.split('T')[0]; // ISO 형식에서 날짜 부분만 추출
-        console.log('비교 - 오늘:', todayStr, '기록 날짜:', recordDate);
-        
-        if (recordDate === todayStr) {
-          setExistingHistoryDate(checkData.record_date);
-          setExistingHistoryId(checkData.id || null);
-          setIsOverwriteDialogOpen(true);
-          return;
-        } else {
-          console.log('기록 날짜가 오늘이 아님 - 신규 저장 진행');
-        }
-      } else {
-        console.log('오늘 날짜의 히스토리 없음 - 신규 저장 진행');
+      console.log('비교 - 오늘:', todayStr, '기록 날짜:', recordDate);
+      
+      // 오늘 날짜의 히스토리가 존재하는 경우에만 덮어쓰기 다이얼로그 표시
+      if (recordDate === todayStr) {
+        setExistingHistoryDate(checkData.record_date);
+        setExistingHistoryId(checkData.id || null);
+        setIsOverwriteDialogOpen(true);
+        return;
       }
       
-      // 히스토리가 없거나 오늘 날짜가 아니면 바로 저장
+      // 기록 날짜가 오늘이 아니면 신규 저장
+      console.log('기록 날짜가 오늘이 아님 - 신규 저장 진행');
       await performSaveToHistory(false, null);
       
     } catch (error) {
