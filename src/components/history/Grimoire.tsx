@@ -15,6 +15,8 @@ interface ImageGenerationState {
   historyId: string | number;
   title: string;
   description: string;
+  userId: string;
+  recordDate: string;
   status: 'generating' | 'completed' | 'error' | 'saving';
   imageBase64?: string;
   imageUrl?: string;
@@ -35,6 +37,8 @@ interface ImageChangeState {
   historyId: string | number;
   title: string;
   description: string;
+  userId: string;
+  recordDate: string;
   currentImageUrl?: string;
 }
 
@@ -223,7 +227,7 @@ export const Grimoire: React.FC<GrimoireProps> = ({ content, isLoading, onFlip, 
   }, []);
 
   // AI 이미지 생성 시작 (S3 저장 없이 base64로만 받기)
-  const handleGenerateImage = useCallback(async (historyId: string | number, title: string, description: string, e: React.MouseEvent) => {
+  const handleGenerateImage = useCallback(async (historyId: string | number, title: string, description: string, userId: string, recordDate: string, e: React.MouseEvent) => {
     e.stopPropagation();
     e.preventDefault();
     
@@ -232,12 +236,14 @@ export const Grimoire: React.FC<GrimoireProps> = ({ content, isLoading, onFlip, 
       historyId,
       title,
       description,
+      userId,
+      recordDate,
       status: 'generating',
     });
 
     try {
       // 미리보기 API 사용 (S3 저장 안 함)
-      const response = await imageGeneratorApi.previewImageForHistory(historyId);
+      const response = await imageGeneratorApi.previewImageForHistory(historyId, description);
       
       if (response.success && response.data) {
         setImageGeneration(prev => prev ? {
@@ -268,7 +274,9 @@ export const Grimoire: React.FC<GrimoireProps> = ({ content, isLoading, onFlip, 
       // confirm API로 S3에 저장하고 DB 업데이트
       const response = await imageGeneratorApi.confirmImageForHistory(
         imageGeneration.historyId, 
-        imageGeneration.imageBase64
+        imageGeneration.imageBase64,
+        imageGeneration.userId,
+        imageGeneration.recordDate
       );
       
       if (response.success) {
@@ -296,12 +304,10 @@ export const Grimoire: React.FC<GrimoireProps> = ({ content, isLoading, onFlip, 
   }, []);
 
   // 이미지 변경 옵션 팝업 열기
-  const handleImageChangeOpen = useCallback((historyId: string | number, title: string, description: string, currentImageUrl?: string, e?: React.MouseEvent) => {
-    if (e) {
-      e.stopPropagation();
-      e.preventDefault();
-    }
-    setImageChange({ show: true, historyId, title, description, currentImageUrl });
+  const handleImageChangeOpen = useCallback((historyId: string | number, title: string, description: string, userId: string, recordDate: string, e: React.MouseEvent, currentImageUrl?: string) => {
+    e.stopPropagation();
+    e.preventDefault();
+    setImageChange({ show: true, historyId, title, description, userId, recordDate, currentImageUrl });
   }, []);
 
   // 이미지 삭제 확인 팝업 열기
@@ -334,7 +340,7 @@ export const Grimoire: React.FC<GrimoireProps> = ({ content, isLoading, onFlip, 
     
     setImageChange(null);
     // 기존 이미지 생성 로직 호출
-    handleGenerateImage(imageChange.historyId, imageChange.title, imageChange.description, e);
+    handleGenerateImage(imageChange.historyId, imageChange.title, imageChange.description, imageChange.userId, imageChange.recordDate, e);
   }, [imageChange, handleGenerateImage]);
 
   // 전체 페이지 배열을 하나의 useMemo로 통합
@@ -578,7 +584,7 @@ export const Grimoire: React.FC<GrimoireProps> = ({ content, isLoading, onFlip, 
                         onClickCapture={(e) => {
                           e.stopPropagation();
                           e.preventDefault();
-                          handleImageChangeOpen(item.id, item.parsed.title, item.parsed.description, imageUrl, e);
+                          handleImageChangeOpen(item.id, item.parsed.title, item.parsed.description, item.user_id, item.record_date, e, imageUrl);
                         }}
                         onMouseDownCapture={(e) => e.stopPropagation()}
                         className="p-1.5 rounded-full bg-amber-900/80 hover:bg-amber-800 text-amber-100 transition-colors shadow-lg"
@@ -608,7 +614,7 @@ export const Grimoire: React.FC<GrimoireProps> = ({ content, isLoading, onFlip, 
                         e.stopPropagation();
                         e.preventDefault();
                         console.log('AI 이미지 생성 버튼 클릭:', item.id, item.parsed.title);
-                        handleGenerateImage(item.id, item.parsed.title, item.parsed.description, e);
+                        handleGenerateImage(item.id, item.parsed.title, item.parsed.description, item.user_id, item.record_date, e);
                       }}
                       onMouseDownCapture={(e) => {
                         e.stopPropagation();

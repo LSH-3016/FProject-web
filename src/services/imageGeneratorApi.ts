@@ -95,10 +95,11 @@ class ImageGeneratorApiService {
   }
 
   // 이미지 미리보기 생성 (S3/DB 저장 안 함)
-  async previewImageForHistory(historyId: number | string): Promise<PreviewImageResponse> {
+  async previewImageForHistory(historyId: number | string, text: string): Promise<PreviewImageResponse> {
     const response = await fetch(`${IMAGE_GENERATOR_API_URL}/histories/${historyId}/preview-image`, {
       method: 'POST',
       headers: this.getAuthHeaders(),
+      body: JSON.stringify({ text }),
     });
 
     if (!response.ok) {
@@ -110,11 +111,15 @@ class ImageGeneratorApiService {
   }
 
   // 이미지 확정 저장 (S3/DB에 저장)
-  async confirmImageForHistory(historyId: number | string, imageBase64: string): Promise<ConfirmImageResponse> {
+  async confirmImageForHistory(historyId: number | string, imageBase64: string, userId: string, recordDate: string): Promise<ConfirmImageResponse> {
     const response = await fetch(`${IMAGE_GENERATOR_API_URL}/histories/${historyId}/confirm-image`, {
       method: 'POST',
       headers: this.getAuthHeaders(),
-      body: JSON.stringify({ imageBase64 }),
+      body: JSON.stringify({ 
+        imageBase64,
+        userId,
+        recordDate
+      }),
     });
 
     if (!response.ok) {
