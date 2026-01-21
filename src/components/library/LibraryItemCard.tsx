@@ -1,3 +1,4 @@
+import { useState, useRef } from "react";
 import { Check, File, FileText, Globe, Image, Lock, Video } from "lucide-react";
 import { LibraryItem } from "@/types/library";
 import { cn } from "@/lib/utils";
@@ -25,6 +26,28 @@ export function LibraryItemCard({
   onOpen,
 }: LibraryItemCardProps) {
   const IconComponent = iconMap[item.type];
+  
+  // 호버 상태 및 비디오 ref
+  const [isHovered, setIsHovered] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  // 호버 핸들러
+  const handleMouseEnter = () => {
+    setIsHovered(true);
+    if (videoRef.current && item.previewUrl) {
+      videoRef.current.play().catch(() => {
+        // 자동 재생 실패 시 무시
+      });
+    }
+  };
+
+  const handleMouseLeave = () => {
+    setIsHovered(false);
+    if (videoRef.current) {
+      videoRef.current.pause();
+      videoRef.current.currentTime = 0;
+    }
+  };
 
   const formatFileSize = (bytes?: number) => {
     if (!bytes) return "";
@@ -55,6 +78,8 @@ export function LibraryItemCard({
         // 선택 모드가 아닐 때는 상세 미리보기로 진입.
         onOpen?.(item);
       }}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
     >
       {isSelectionMode && (
         <div className="absolute top-3 left-3 z-10">
@@ -72,7 +97,17 @@ export function LibraryItemCard({
       )}
 
       <div className="relative aspect-[4/3] bg-secondary/30 overflow-hidden">
-        {item.thumbnail ? (
+        {/* 동영상이고 프리뷰 URL이 있으면 호버 시 비디오 재생 */}
+        {item.type === "video" && item.previewUrl && isHovered ? (
+          <video
+            ref={videoRef}
+            src={item.previewUrl}
+            className="w-full h-full object-cover"
+            muted
+            loop
+            playsInline
+          />
+        ) : item.thumbnail ? (
           <img
             src={item.thumbnail}
             alt={item.name}

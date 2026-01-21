@@ -22,6 +22,7 @@ interface ApiLibraryItem {
   preview_text?: string | null;
   file_url?: string | null;
   thumbnail_url?: string | null;
+  preview_url?: string | null;  // 동영상 프리뷰 URL
 }
 
 interface PresignedUrlResponse {
@@ -346,6 +347,7 @@ class ApiService {
       visibility: item.visibility,
       thumbnail: fixUrl(item.thumbnail_url) || fixUrl(item.file_url) || undefined,
       preview: item.preview_text || undefined,
+      previewUrl: fixUrl(item.preview_url) || undefined,  // 동영상 프리뷰 URL 추가
       createdAt: new Date(item.created_at),
       size: item.file_size,
     };

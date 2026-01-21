@@ -1,12 +1,14 @@
 import { useState } from "react";
 import { LibrarySidebar } from "./LibrarySidebar";
+import { LibrarianWidget } from "../LibrarianWidget";
 
 interface MainLayoutProps {
   children: React.ReactNode;
   showSidebar?: boolean;
+  showLibrarian?: boolean; // LibrarianWidget 표시 여부
 }
 
-export function MainLayout({ children, showSidebar = true }: MainLayoutProps) {
+export function MainLayout({ children, showSidebar = true, showLibrarian = true }: MainLayoutProps) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   // 토글 함수
@@ -29,6 +31,14 @@ export function MainLayout({ children, showSidebar = true }: MainLayoutProps) {
           isOpen={isSidebarOpen}
           onClose={() => setIsSidebarOpen(false)}
           onToggle={() => setIsSidebarOpen(!isSidebarOpen)}
+        />
+      )}
+
+      {/* Librarian Widget - 모든 화면에 고정 */}
+      {showLibrarian && (
+        <LibrarianWidget 
+          initialPosition="bottom-right"
+          size={{ width: 200, height: 280 }}
         />
       )}
 

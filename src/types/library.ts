@@ -9,6 +9,7 @@ export interface LibraryItem {
   visibility: LibraryItemVisibility;
   thumbnail?: string;
   preview?: string;
+  previewUrl?: string;  // 동영상 프리뷰 URL
   createdAt: Date;
   size?: number;
 }

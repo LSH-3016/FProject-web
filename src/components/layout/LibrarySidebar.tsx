@@ -143,7 +143,7 @@ export function LibrarySidebar({ isOpen, onClose, onToggle }: LibrarySidebarProp
       {/* 1. 사이드바 배경 (Overlay) */}
       <div
         className={cn(
-          "fixed inset-0 bg-background/80 backdrop-blur-sm z-40 transition-opacity duration-300",
+          "fixed inset-0 bg-background/80 backdrop-blur-sm z-[100] transition-opacity duration-300",
           isOpen ? "opacity-100" : "opacity-0 pointer-events-none"
         )}
         onClick={onClose}
@@ -152,7 +152,7 @@ export function LibrarySidebar({ isOpen, onClose, onToggle }: LibrarySidebarProp
       {/* 2. 사이드바 본문 */}
       <aside
         className={cn(
-          "fixed left-0 top-0 h-full w-72 z-50 transition-transform duration-500 ease-out",
+          "fixed left-0 top-0 h-full w-72 z-[110] transition-transform duration-500 ease-out",
           isOpen ? "translate-x-0" : "-translate-x-full"
         )}
       >
@@ -217,7 +217,7 @@ export function LibrarySidebar({ isOpen, onClose, onToggle }: LibrarySidebarProp
 
       {/* 3. 로그아웃 확인 모달 */}
       {isLogoutModalOpen && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center px-4">
+        <div className="fixed inset-0 z-[120] flex items-center justify-center px-4">
             {/* Backdrop */}
             <div 
                 className="absolute inset-0 bg-black/60 backdrop-blur-sm"
