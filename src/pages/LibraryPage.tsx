@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { MainLayout } from "@/components/layout/MainLayout";
-import { FolderOpen, Image, FileText, Film, MoreVertical, File, AlertCircle } from "lucide-react";
+import { FolderOpen, Image, FileText, Film, File, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import CircularGallery from "@/components/CircularGallery";
 import { useNavigate } from "react-router-dom";
@@ -359,7 +359,7 @@ const LibraryPage = () => {
                     )}
 
                     <div className="absolute top-3 left-3 w-8 h-8 rounded-md bg-background/80 flex items-center justify-center">
-                      <Icon className="w-4 h-4 text-ink/50" />
+                      <Icon className="w-4 h-4 text-gold" />
                     </div>
 
                     {(item.type === "document" || item.type === "file") && item.latestItem && (
@@ -369,16 +369,6 @@ const LibraryPage = () => {
                         </p>
                       </div>
                     )}
-
-                    <button
-                      className="absolute top-3 right-3 p-1.5 rounded-full bg-background/80 transition-opacity"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        navigate(item.route);
-                      }}
-                    >
-                      <MoreVertical className="w-4 h-4 text-ink/60" />
-                    </button>
                   </div>
 
                   <div className="px-4 py-3 border-t border-ink/10 bg-background/10">
