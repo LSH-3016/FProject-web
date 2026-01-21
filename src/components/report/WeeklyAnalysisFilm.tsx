@@ -4,9 +4,11 @@ import { ReportResponse } from '@/services/reportApi';
 
 interface WeeklyAnalysisFilmProps {
   reports: ReportResponse[];
+  onCreateReport?: () => void;
+  isCreatingReport?: boolean;
 }
 
-const WeeklyAnalysisFilm = ({ reports }: WeeklyAnalysisFilmProps) => {
+const WeeklyAnalysisFilm = ({ reports, onCreateReport, isCreatingReport = false }: WeeklyAnalysisFilmProps) => {
   const [width, setWidth] = useState(0);
   const [currentIndex, setCurrentIndex] = useState(0);
   const carousel = useRef<HTMLDivElement>(null);
@@ -129,15 +131,44 @@ const WeeklyAnalysisFilm = ({ reports }: WeeklyAnalysisFilmProps) => {
         >
           {archiveData.length === 0 ? (
             <motion.article className="flex-none w-[90vw] md:w-[70vw] lg:w-[50vw] h-[85vh] select-none">
-              <div className="relative bg-[#2a2520] border-x-[25px] border-[#050403] shadow-[0_0_80px_rgba(0,0,0,1)] h-full flex flex-col items-center justify-center">
-                <div className="text-center space-y-6 p-12">
-                  <div className="text-6xl mb-4">📊</div>
-                  <p className="text-amber-200 text-xl font-medium">
-                    리포트가 없습니다
-                  </p>
-                  <p className="text-amber-300/70 text-sm">
-                    일기를 작성하고 리포트를 생성해보세요
-                  </p>
+              <div className="relative bg-[#2a2520] border-x-[25px] border-[#050403] shadow-[0_0_80px_rgba(0,0,0,1)] h-full flex flex-col">
+                {/* 상단 필름 구멍 */}
+                <div className="h-14 bg-[#050403] flex justify-around items-center px-4 flex-shrink-0">
+                  {[...Array(6)].map((_, i) => (
+                    <div 
+                      key={i} 
+                      className="w-8 h-5 bg-amber-200/10 rounded-sm shadow-[0_0_8px_rgba(251,191,36,0.2)] border border-white/10"
+                    ></div>
+                  ))}
+                </div>
+
+                {/* 빈 상태 콘텐츠 */}
+                <div className="flex-1 flex items-center justify-center p-12 bg-gradient-to-b from-amber-100/10 via-transparent to-black/10">
+                  <div className="text-center space-y-6">
+                    <div className="text-6xl mb-4">📊</div>
+                    <p className="text-amber-200 text-xl font-medium">
+                      일기를 꾸준히 작성하여 나만의 리포트를 받아보세요!
+                    </p>
+                    {onCreateReport && (
+                      <button
+                        onClick={onCreateReport}
+                        disabled={isCreatingReport}
+                        className="mt-6 px-8 py-3 bg-amber-600 hover:bg-amber-700 text-white font-semibold rounded-xl transition-colors shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {isCreatingReport ? '리포트 생성 중...' : '리포트 생성'}
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* 하단 필름 구멍 */}
+                <div className="h-14 bg-[#050403] flex justify-around items-center px-4 flex-shrink-0">
+                  {[...Array(6)].map((_, i) => (
+                    <div 
+                      key={i} 
+                      className="w-8 h-5 bg-amber-200/10 rounded-sm shadow-[0_0_8px_rgba(251,191,36,0.2)] border border-white/10"
+                    ></div>
+                  ))}
                 </div>
               </div>
             </motion.article>

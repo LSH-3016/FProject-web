@@ -140,24 +140,12 @@ const Report = () => {
               <p className="font-serif text-muted-foreground">리포트를 불러오는 중...</p>
             </div>
           </div>
-        ) : weeklyReportData.length === 0 ? (
-          <div className="h-screen flex items-center justify-center bg-background">
-            <div className="text-center space-y-6">
-              <div className="text-6xl mb-4">📊</div>
-              <p className="text-foreground text-xl font-medium">
-                일기를 꾸준히 작성하여 나만의 리포트를 받아보세요!
-              </p>
-              <button
-                onClick={() => setShowConfirmModal(true)}
-                disabled={isCreatingReport}
-                className="mt-6 px-8 py-3 bg-amber-600 hover:bg-amber-700 text-white font-semibold rounded-xl transition-colors shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isCreatingReport ? '리포트 생성 중...' : '리포트 생성'}
-              </button>
-            </div>
-          </div>
         ) : (
-          <WeeklyAnalysisFilm reports={weeklyReportData} />
+          <WeeklyAnalysisFilm 
+            reports={weeklyReportData} 
+            onCreateReport={() => setShowConfirmModal(true)}
+            isCreatingReport={isCreatingReport}
+          />
         )}
       </MainLayout>
     </>

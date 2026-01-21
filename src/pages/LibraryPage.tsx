@@ -1,12 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { MainLayout } from "@/components/layout/MainLayout";
-import { FolderOpen, Image, FileText, Film, MoreVertical, File, X, AlertCircle } from "lucide-react";
+import { FolderOpen, Image, FileText, Film, MoreVertical, File, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import CircularGallery from "@/components/CircularGallery";
 import { useNavigate } from "react-router-dom";
 import { useLibraryContext } from "@/contexts/LibraryContext";
-import { LibraryItemType, LibraryItemVisibility, LibraryTypeConfig } from "@/types/library";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { LibraryItemType, LibraryTypeConfig } from "@/types/library";
 import { AddItemModal } from "@/components/library/AddItemModal";
 import { useAuth } from "@/hooks/useAuth";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
@@ -57,18 +56,8 @@ const getIcon = (type: "image" | "document" | "video" | "file") => {
 
 const LibraryPage = () => {
   const [isUploadMenuOpen, setIsUploadMenuOpen] = useState(false);
-  const [openItemMenuId, setOpenItemMenuId] = useState<string | null>(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [selectedUploadType, setSelectedUploadType] = useState<LibraryItemType | null>(null);
-  const [visibilityModal, setVisibilityModal] = useState<{
-    isOpen: boolean;
-    type: LibraryItemType | null;
-    visibility: LibraryItemVisibility;
-  }>({
-    isOpen: false,
-    type: null,
-    visibility: "public",
-  });
   const uploadMenuRef = useRef<HTMLDivElement | null>(null);
   const navigate = useNavigate();
   const { isAuthenticated, isLoading: authLoading, isCognitoConfigured } = useAuth();
@@ -220,23 +209,6 @@ const LibraryPage = () => {
     };
   }, [isUploadMenuOpen]);
 
-  useEffect(() => {
-    // 아이템 드롭다운이 열려 있을 때 바깥 클릭으로 닫기
-    if (!openItemMenuId) {
-      return;
-    }
-
-    const handleClickOutside = () => {
-      setOpenItemMenuId(null);
-    };
-
-    document.addEventListener("click", handleClickOutside);
-
-    return () => {
-      document.removeEventListener("click", handleClickOutside);
-    };
-  }, [openItemMenuId]);
-
   const handleUploadClick = (target: LibraryItemType) => {
     setIsUploadMenuOpen(false);
     setSelectedUploadType(target);
@@ -253,19 +225,6 @@ const LibraryPage = () => {
     const config = libraryTypeConfigs.find(c => c.type === type);
     return config?.label || type;
   };
-  const handleVisibilityOpen = (type: LibraryItemType, visibility: LibraryItemVisibility) => {
-    // 공개 상태별 목록을 팝업으로 표시.
-    setOpenItemMenuId(null);
-    setVisibilityModal({
-      isOpen: true,
-      type,
-      visibility,
-    });
-  };
-  const visibilityItems = visibilityModal.type
-    ? getItemsByType(visibilityModal.type).filter((item) => item.visibility === visibilityModal.visibility)
-    : [];
-  const isMediaList = visibilityModal.type === "image" || visibilityModal.type === "video";
 
   return (
     <MainLayout>
@@ -324,7 +283,6 @@ const LibraryPage = () => {
                 aria-haspopup="menu"
                 aria-expanded={isUploadMenuOpen}
                 onClick={() => {
-                  setOpenItemMenuId(null);
                   setIsUploadMenuOpen((prev) => !prev);
                 }}
               >
@@ -416,35 +374,11 @@ const LibraryPage = () => {
                       className="absolute top-3 right-3 p-1.5 rounded-full bg-background/80 transition-opacity"
                       onClick={(e) => {
                         e.stopPropagation();
-                        setIsUploadMenuOpen(false);
-                        setOpenItemMenuId((prev) => (prev === item.type ? null : item.type));
+                        navigate(item.route);
                       }}
                     >
                       <MoreVertical className="w-4 h-4 text-ink/60" />
                     </button>
-
-                    {openItemMenuId === item.type && (
-                      <div
-                        role="menu"
-                        className="absolute top-12 right-4 w-28 rounded-md border border-ink/10 bg-background/95 shadow-page backdrop-blur-sm z-20"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <button
-                          type="button"
-                          className="w-full text-left px-3 py-2 text-sm font-serif text-sepia hover:bg-gold/10 hover:text-gold transition-colors"
-                          onClick={() => handleVisibilityOpen(item.type, "public")}
-                        >
-                          public
-                        </button>
-                        <button
-                          type="button"
-                          className="w-full text-left px-3 py-2 text-sm font-serif text-sepia hover:bg-gold/10 hover:text-gold transition-colors"
-                          onClick={() => handleVisibilityOpen(item.type, "private")}
-                        >
-                          private
-                        </button>
-                      </div>
-                    )}
                   </div>
 
                   <div className="px-4 py-3 border-t border-ink/10 bg-background/10">
@@ -470,90 +404,21 @@ const LibraryPage = () => {
               </p>
             </div>
           )}
-
-          <Dialog
-            open={visibilityModal.isOpen}
-            onOpenChange={(open) =>
-              setVisibilityModal((prev) => ({ ...prev, isOpen: open }))
-            }
-          >
-            <DialogContent className="max-w-5xl paper-texture border border-ink/10 [&>button]:hidden [&>button.loveable-close]:block h-[600px]">
-              <button
-                type="button"
-                className="loveable-close absolute right-4 top-4 rounded-full bg-ink/10 p-2 text-ink hover:bg-ink/20 transition-colors"
-                onClick={() => setVisibilityModal((prev) => ({ ...prev, isOpen: false }))}
-                aria-label="닫기"
-              >
-                <X className="h-4 w-4" />
-              </button>
-              <DialogHeader>
-                <DialogTitle className="text-xl font-serif text-ink">
-                  {visibilityModal.visibility} 항목
-                </DialogTitle>
-              </DialogHeader>
-              <div className="mt-3 space-y-2 text-ink/80">
-                {visibilityItems.length === 0 ? (
-                  <p className="font-handwriting text-sm text-ink/60">
-                    해당 항목이 없습니다.
-                  </p>
-                ) : isMediaList ? (
-                  <div className="flex gap-6 overflow-x-auto snap-x snap-mandatory">
-                    {visibilityItems.map((item) => (
-                      <div
-                        key={item.id}
-                        className="relative shrink-0 w-90 h-80 rounded-xl overflow-hidden border border-ink/10 bg-secondary/30 snap-center"
-                      >
-                        {item.thumbnail ? (
-                          <img
-                            src={item.thumbnail}
-                            alt={item.name}
-                            className="h-full w-full object-cover"
-                          />
-                        ) : (
-                          <div className="h-full w-full flex items-center justify-center text-ink/40">
-                            미리보기 없음
-                          </div>
-                        )}
-                        <div className="absolute bottom-2 right-3 rounded-full bg-ink/40 px-2 py-1 text-sm font-serif font-semibold text-ink shadow-sm">
-                          {item.name}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <ul className="space-y-3">
-                    {visibilityItems.map((item) => (
-                      <li key={item.id} className="flex items-start gap-3">
-                        <div className="flex-1">
-                          <p className="text-sm font-serif text-ink">{item.name}</p>
-                          {item.type === "document" && item.preview && (
-                            <p className="text-xs text-ink/60 whitespace-pre-line line-clamp-2">
-                              {item.preview}
-                            </p>
-                          )}
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            </DialogContent>
-          </Dialog>
-
-          {/* AddItemModal for file upload */}
-          {selectedUploadType && (
-            <AddItemModal
-              isOpen={isAddModalOpen}
-              onClose={() => {
-                setIsAddModalOpen(false);
-                setSelectedUploadType(null);
-              }}
-              itemType={selectedUploadType}
-              typeLabel={getTypeLabel(selectedUploadType)}
-              onAdd={handleAddItem}
-            />
-          )}
         </div>
+
+        {/* AddItemModal for file upload */}
+        {selectedUploadType && (
+          <AddItemModal
+            isOpen={isAddModalOpen}
+            onClose={() => {
+              setIsAddModalOpen(false);
+              setSelectedUploadType(null);
+            }}
+            itemType={selectedUploadType}
+            typeLabel={getTypeLabel(selectedUploadType)}
+            onAdd={handleAddItem}
+          />
+        )}
       </div>
     </MainLayout>
   );
