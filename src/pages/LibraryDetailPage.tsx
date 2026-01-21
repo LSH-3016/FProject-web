@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, MoreVertical, Plus, Trash2, X, Eye, EyeOff } from "lucide-react";
+import { ArrowLeft, MoreVertical, Plus, Trash2, X } from "lucide-react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { LibraryItemCard } from "@/components/library/LibraryItemCard";
 import { DeleteConfirmModal } from "@/components/library/DeleteConfirmModal";
 import { AddItemModal } from "@/components/library/AddItemModal";
 import { useLibraryContext } from "@/contexts/LibraryContext";
-import { LibraryItem, LibraryItemType, LibraryItemVisibility, LibraryTypeConfig } from "@/types/library";
+import { LibraryItem, LibraryItemType, LibraryTypeConfig } from "@/types/library";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useAuth } from "@/hooks/useAuth";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
@@ -47,7 +47,7 @@ const LibraryDetailPage = () => {
   const navigate = useNavigate();
   const { isAuthenticated, isLoading: authLoading, isCognitoConfigured } = useAuth();
   const { displayName, isLoading: userLoading, userId } = useCurrentUser();
-  const { getItemsByType, deleteItems, addItem, updateItemsVisibility } = useLibraryContext();
+  const { getItemsByType, deleteItems, addItem } = useLibraryContext();
   const menuRef = useRef<HTMLDivElement | null>(null);
 
   const itemType = type as LibraryItemType;
@@ -123,8 +123,6 @@ const LibraryDetailPage = () => {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [previewItem, setPreviewItem] = useState<LibraryItem | null>(null);
-  const [isTogglingVisibility, setIsTogglingVisibility] = useState(false);
-  const [isVisibilityMode, setIsVisibilityMode] = useState(false);
 
   const items = useMemo(() => getItemsByType(itemType), [getItemsByType, itemType]);
 
@@ -175,69 +173,18 @@ const LibraryDetailPage = () => {
   const handleEnterDeleteMode = () => {
     setIsMenuOpen(false);
     setIsSelectionMode(true);
-    setIsVisibilityMode(false);
-    setSelectedIds([]);
-  };
-
-  const handleEnterVisibilityMode = () => {
-    setIsMenuOpen(false);
-    setIsSelectionMode(true);
-    setIsVisibilityMode(true);
     setSelectedIds([]);
   };
 
   const handleCancelSelection = () => {
     setIsSelectionMode(false);
-    setIsVisibilityMode(false);
     setSelectedIds([]);
   };
 
   const handleDeleteConfirm = () => {
     deleteItems(selectedIds);
     setIsSelectionMode(false);
-    setIsVisibilityMode(false);
     setSelectedIds([]);
-  };
-
-  const handleVisibilityChange = async (newVisibility: LibraryItemVisibility) => {
-    if (selectedIds.length === 0 || isTogglingVisibility) return;
-    
-    try {
-      setIsTogglingVisibility(true);
-      await updateItemsVisibility(selectedIds, newVisibility);
-      setIsSelectionMode(false);
-      setIsVisibilityMode(false);
-      setSelectedIds([]);
-    } catch (error) {
-      console.error('Visibility 변경 실패:', error);
-    } finally {
-      setIsTogglingVisibility(false);
-    }
-  };
-
-  const handleToggleSelectedVisibility = async () => {
-    if (selectedIds.length === 0 || isTogglingVisibility) return;
-    
-    try {
-      setIsTogglingVisibility(true);
-      
-      // 선택된 각 아이템의 현재 visibility를 반대로 변경
-      for (const itemId of selectedIds) {
-        const item = items.find(item => item.id === itemId);
-        if (item) {
-          const newVisibility: LibraryItemVisibility = item.visibility === 'public' ? 'private' : 'public';
-          await updateItemsVisibility([itemId], newVisibility);
-        }
-      }
-      
-      setIsSelectionMode(false);
-      setIsVisibilityMode(false);
-      setSelectedIds([]);
-    } catch (error) {
-      console.error('Visibility 토글 실패:', error);
-    } finally {
-      setIsTogglingVisibility(false);
-    }
   };
 
   const handleAddItem = (item: LibraryItem) => {
@@ -248,31 +195,6 @@ const LibraryDetailPage = () => {
     if (item.type === "image" || item.type === "video") {
       // 이미지/영상만 크게 미리보기로 열기.
       setPreviewItem(item);
-    }
-  };
-
-  const handleToggleAllVisibility = async () => {
-    if (items.length === 0 || isTogglingVisibility) return;
-    
-    try {
-      setIsTogglingVisibility(true);
-      
-      // 현재 아이템들의 visibility 상태 확인
-      const publicItems = items.filter(item => item.visibility === 'public');
-      const privateItems = items.filter(item => item.visibility === 'private');
-      
-      // 대부분이 public이면 private으로, 대부분이 private이면 public으로
-      const shouldMakePublic = privateItems.length >= publicItems.length;
-      const newVisibility: LibraryItemVisibility = shouldMakePublic ? 'public' : 'private';
-      
-      // 모든 아이템의 visibility 변경
-      const allItemIds = items.map(item => item.id);
-      await updateItemsVisibility(allItemIds, newVisibility);
-      
-    } catch (error) {
-      console.error('Visibility 변경 실패:', error);
-    } finally {
-      setIsTogglingVisibility(false);
     }
   };
 
@@ -314,17 +236,6 @@ const LibraryDetailPage = () => {
               </div>
             ) : (
               <div className="flex items-center gap-3">
-                {/* Visibility Toggle Button */}
-                <button
-                  type="button"
-                  className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center text-ink hover:text-gold transition-colors"
-                  onClick={handleEnterVisibilityMode}
-                  disabled={items.length === 0}
-                  title="아이템 공개/비공개 설정"
-                >
-                  <Eye className="w-5 h-5" />
-                </button>
-                
                 {/* Dropdown Menu Button */}
                 <div ref={menuRef} className="relative">
                   <button
@@ -402,30 +313,14 @@ const LibraryDetailPage = () => {
       {isSelectionMode && selectedIds.length > 0 && (
         <div className="fixed bottom-0 left-0 right-0 bg-background/95 border-t border-ink/10 p-4 backdrop-blur-sm">
           <div className="max-w-5xl mx-auto flex justify-end gap-3">
-            {isVisibilityMode ? (
-              <button
-                type="button"
-                className={`vintage-btn px-5 py-3 rounded-md font-serif transition-colors ${
-                  isTogglingVisibility 
-                    ? 'text-ink/50 cursor-not-allowed' 
-                    : 'text-sepia hover:text-gold'
-                }`}
-                onClick={handleToggleSelectedVisibility}
-                disabled={isTogglingVisibility}
-              >
-                <Eye className="w-4 h-4 inline-block mr-2" />
-                {selectedIds.length}개 변경
-              </button>
-            ) : (
-              <button
-                type="button"
-                className="vintage-btn px-5 py-3 rounded-md font-serif text-sepia hover:text-gold transition-colors"
-                onClick={() => setIsDeleteModalOpen(true)}
-              >
-                <Trash2 className="w-4 h-4 inline-block mr-2" />
-                {selectedIds.length}개 삭제
-              </button>
-            )}
+            <button
+              type="button"
+              className="vintage-btn px-5 py-3 rounded-md font-serif text-sepia hover:text-gold transition-colors"
+              onClick={() => setIsDeleteModalOpen(true)}
+            >
+              <Trash2 className="w-4 h-4 inline-block mr-2" />
+              {selectedIds.length}개 삭제
+            </button>
           </div>
         </div>
       )}

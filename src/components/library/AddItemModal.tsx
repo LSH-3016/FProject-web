@@ -1,18 +1,11 @@
 import { useState, useRef } from "react";
-import { Globe, Lock, Plus, Upload, X, FileIcon, ImageIcon, VideoIcon, FileTextIcon } from "lucide-react";
-import { LibraryItemType, LibraryItemVisibility } from "@/types/library";
+import { Plus, Upload, X, FileIcon, ImageIcon, VideoIcon, FileTextIcon } from "lucide-react";
+import { LibraryItemType } from "@/types/library";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { apiService } from "@/services/api";
 import { useToast } from "@/hooks/use-toast";
 
@@ -32,7 +25,6 @@ export function AddItemModal({
   onAdd,
 }: AddItemModalProps) {
   const [name, setName] = useState("");
-  const [visibility, setVisibility] = useState<LibraryItemVisibility>("private");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -122,7 +114,7 @@ export function AddItemModal({
       const uploadedItem = await apiService.uploadFile(
         selectedFile,
         name.trim(),
-        visibility,
+        "private",
         (progress) => {
           setUploadProgress(progress);
         }
@@ -138,7 +130,6 @@ export function AddItemModal({
       
       // 폼 초기화
       setName("");
-      setVisibility("private");
       setSelectedFile(null);
       setUploadProgress(0);
       if (fileInputRef.current) {
@@ -255,36 +246,6 @@ export function AddItemModal({
               className="bg-background"
               disabled={isUploading}
             />
-          </div>
-
-          {/* 공개 상태 선택 */}
-          <div className="space-y-2">
-            <Label htmlFor="visibility" className="text-ink/80">
-              공개 상태
-            </Label>
-            <Select 
-              value={visibility} 
-              onValueChange={(value) => setVisibility(value as LibraryItemVisibility)}
-              disabled={isUploading}
-            >
-              <SelectTrigger className="bg-background">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent className="bg-popover border-ink/10">
-                <SelectItem value="private">
-                  <div className="flex items-center gap-2">
-                    <Lock className="w-4 h-4" />
-                    Private
-                  </div>
-                </SelectItem>
-                <SelectItem value="public">
-                  <div className="flex items-center gap-2">
-                    <Globe className="w-4 h-4" />
-                    Public
-                  </div>
-                </SelectItem>
-              </SelectContent>
-            </Select>
           </div>
 
           {/* 업로드 진행률 */}

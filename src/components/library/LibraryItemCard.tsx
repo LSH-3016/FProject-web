@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { Check, File, FileText, Globe, Image, Lock, Video } from "lucide-react";
+import { Check, File, FileText, Image, Video } from "lucide-react";
 import { LibraryItem } from "@/types/library";
 import { cn } from "@/lib/utils";
 
@@ -124,27 +124,6 @@ export function LibraryItemCard({
             <IconComponent className="w-10 h-10 text-ink/30" />
           </div>
         )}
-
-        <div
-          className={cn(
-            "absolute top-3 right-3 px-2 py-1 rounded-full text-xs font-serif flex items-center gap-1",
-            item.visibility === "public"
-              ? "bg-gold/20 text-gold"
-              : "bg-ink/10 text-ink/70"
-          )}
-        >
-          {item.visibility === "public" ? (
-            <>
-              <Globe className="w-3 h-3" />
-              Public
-            </>
-          ) : (
-            <>
-              <Lock className="w-3 h-3" />
-              Private
-            </>
-          )}
-        </div>
       </div>
 
       <div className="p-4 border-t border-ink/10 bg-background/10">
