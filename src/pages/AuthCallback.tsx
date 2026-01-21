@@ -4,6 +4,9 @@ import { useAuth } from '@/hooks/useAuth';
 import { toast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
 
+// 전역 변수로 코드 사용 여부 추적 (React Strict Mode 대응)
+const usedCodes = new Set<string>();
+
 /**
  * Google OAuth 로그인 후 Cognito Hosted UI에서 리다이렉트되는 콜백 페이지
  *
@@ -94,6 +97,15 @@ const AuthCallback = () => {
           });
           return;
         }
+        
+        // 이미 사용된 코드인지 확인 (React Strict Mode 대응)
+        if (usedCodes.has(code)) {
+          console.log('⚠️ 이미 사용된 인증 코드입니다. 무시합니다.');
+          return;
+        }
+        
+        // 코드를 사용됨으로 표시
+        usedCodes.add(code);
         
         console.log('✅ OAuth 코드 확인됨:', code.substring(0, 10) + '...');
         

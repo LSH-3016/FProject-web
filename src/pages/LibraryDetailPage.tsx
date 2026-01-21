@@ -451,14 +451,25 @@ const LibraryDetailPage = () => {
             <DialogTitle>{previewItem?.name || "미리보기"}</DialogTitle>
           </DialogHeader>
           {previewItem?.thumbnail ? (
-            <img
-              src={previewItem.thumbnail}
-              alt={previewItem.name}
-              className="w-full h-full object-contain"
-            />
+            previewItem.type === "video" ? (
+              <video
+                src={previewItem.thumbnail}
+                controls
+                autoPlay
+                className="w-full h-full object-contain max-h-[80vh]"
+              >
+                브라우저가 동영상을 지원하지 않습니다.
+              </video>
+            ) : (
+              <img
+                src={previewItem.thumbnail}
+                alt={previewItem.name}
+                className="w-full h-full object-contain"
+              />
+            )
           ) : (
             <div className="p-8 text-center font-serif text-ink">
-              미리보기 이미지가 없습니다.
+              미리보기가 없습니다.
             </div>
           )}
         </DialogContent>
