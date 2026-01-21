@@ -311,7 +311,7 @@ const Auth = () => {
   };
 
   return (
-    <MainLayout showSidebar={false}>
+    <MainLayout showSidebar={false} showLibrarian={false}>
       <div className="min-h-screen flex items-center justify-center py-12 px-4">
         <div className="relative w-full max-w-md perspective-1000">
           

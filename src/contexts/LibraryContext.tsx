@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useMemo, useState, useEffect } from "react";
+import { createContext, useCallback, useContext, useMemo, useState, useEffect, useRef } from "react";
 import { LibraryItem, LibraryItemType, LibraryItemVisibility } from "@/types/library";
 import { apiService } from "@/services/api";
 
@@ -21,6 +21,7 @@ export function LibraryProvider({ children }: { children: React.ReactNode }) {
   const [items, setItems] = useState<LibraryItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // 아이템 목록 새로고침
   const refreshItems = useCallback(async () => {
@@ -40,11 +41,61 @@ export function LibraryProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  // 썸네일 없는 동영상 아이템만 조회하여 업데이트하는 함수
+  const checkPendingThumbnails = useCallback(async () => {
+    // 썸네일 없는 동영상 아이템 찾기
+    const pendingVideoItems = items.filter((item) => item.type === "video" && !item.thumbnail);
+    
+    if (pendingVideoItems.length === 0) {
+      // 대기 중인 아이템 없으면 polling 중지
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
+        pollingIntervalRef.current = null;
+      }
+      return;
+    }
+
+    try {
+      // 각 아이템의 최신 정보 조회
+      const { items: freshItems } = await apiService.getMyLibraryItems(1, 100);
+      
+      // 썸네일이 생성된 아이템 업데이트
+      setItems((prev) =>
+        prev.map((item) => {
+          const freshItem = freshItems.find((f) => f.id === item.id);
+          if (freshItem && item.type === "video" && !item.thumbnail && freshItem.thumbnail) {
+            return { ...item, thumbnail: freshItem.thumbnail };
+          }
+          return item;
+        })
+      );
+    } catch (err) {
+      console.error("썸네일 상태 확인 실패:", err);
+    }
+  }, [items]);
+
   // 컴포넌트 마운트 시 아이템 로드
   useEffect(() => {
     // 실제 API 사용 (개발/운영 모두)
     refreshItems();
   }, [refreshItems]);
+
+  // 썸네일 없는 동영상이 있으면 polling 시작
+  useEffect(() => {
+    const hasPendingVideos = items.some((item) => item.type === "video" && !item.thumbnail);
+    
+    if (hasPendingVideos && !pollingIntervalRef.current) {
+      // 10초마다 확인
+      pollingIntervalRef.current = setInterval(checkPendingThumbnails, 10000);
+    }
+
+    return () => {
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
+        pollingIntervalRef.current = null;
+      }
+    };
+  }, [items, checkPendingThumbnails]);
 
   const getItemsByType = useCallback(
     (type: LibraryItemType) =>

@@ -41,7 +41,7 @@ export const LibrarianWidget: React.FC<LibrarianWidgetProps> = ({
   const getInitialPosition = () => {
     if (typeof initialPosition === 'string') {
       if (initialPosition === 'bottom-right') {
-        return { x: window.innerWidth - 230, y: 30 };
+        return { x: window.innerWidth - 280, y: 30 };
       } else if (initialPosition === 'bottom-left') {
         return { x: 30, y: 30 };
       }
@@ -315,7 +315,7 @@ export const LibrarianWidget: React.FC<LibrarianWidgetProps> = ({
       {/* 챗봇 창 */}
       {isChatOpen && (
         <div 
-          className="chatbot-window absolute bottom-full left-0 mb-20 w-80 bg-amber-50/95 backdrop-blur-sm rounded-2xl shadow-2xl border-2 border-amber-700 overflow-hidden z-[100]"
+          className="chatbot-window absolute bottom-full left-0 mb-20 w-96 bg-amber-50/95 backdrop-blur-sm rounded-2xl shadow-2xl border-2 border-amber-700 overflow-hidden z-[100]"
           onMouseDown={(e) => e.stopPropagation()}
           onClick={(e) => e.stopPropagation()}
           style={{ cursor: 'default' }}
@@ -345,7 +345,7 @@ export const LibrarianWidget: React.FC<LibrarianWidgetProps> = ({
             </button>
           </div>
           
-          {/* 메시지 영역 */}
+          {/* 메시지 영역 - 세로 크기 원래대로 */}
           <div className="h-48 overflow-y-auto p-3 space-y-3">
             {messages.map((msg, i) => (
               <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
@@ -428,13 +428,13 @@ export const LibrarianWidget: React.FC<LibrarianWidgetProps> = ({
         )}
         <div ref={containerRef} className="w-full h-full" />
         
-        {/* 말풍선 힌트 - 스케일 보정으로 크기 유지 */}
+        {/* 말풍선 힌트 - 크기 키우고 더 눈에 띄게 */}
         {!isChatOpen && !isLoading && (
           <div 
-            className="absolute -top-2 left-1/2 -translate-x-1/2 bg-amber-100 text-amber-800 text-[7px] px-2 py-1 rounded-full shadow-md whitespace-nowrap animate-bounce"
+            className="absolute -top-4 left-1/2 -translate-x-1/2 bg-amber-100 text-amber-800 text-xs font-semibold px-4 py-2 rounded-full shadow-lg whitespace-nowrap animate-bounce border-2 border-amber-300"
             style={{ transform: `translateX(-50%) scale(${1/scale})` }}
           >
-            챗봇 창 열기
+            💬 챗봇 창 열기
           </div>
         )}
       </div>

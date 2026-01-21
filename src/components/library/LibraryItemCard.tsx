@@ -113,6 +113,12 @@ export function LibraryItemCard({
             alt={item.name}
             className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
           />
+        ) : item.type === "video" ? (
+          // 동영상인데 썸네일 없으면 처리 중 표시
+          <div className="w-full h-full flex flex-col items-center justify-center">
+            <Video className="w-10 h-10 text-ink/30 animate-pulse" />
+            <span className="text-xs text-ink/50 mt-2">썸네일 생성 중...</span>
+          </div>
         ) : (
           <div className="w-full h-full flex items-center justify-center">
             <IconComponent className="w-10 h-10 text-ink/30" />
