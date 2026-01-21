@@ -23,6 +23,7 @@ interface ApiLibraryItem {
   file_url?: string | null;
   thumbnail_url?: string | null;
   preview_url?: string | null;  // 동영상 프리뷰 URL
+  subtitle_url?: string | null; // 자막 파일 URL
 }
 
 interface PresignedUrlResponse {
@@ -345,9 +346,11 @@ class ApiService {
       name: item.name,
       type: item.type,
       visibility: item.visibility,
-      thumbnail: fixUrl(item.thumbnail_url) || fixUrl(item.file_url) || undefined,
+      thumbnail: fixUrl(item.thumbnail_url) || undefined,
       preview: item.preview_text || undefined,
-      previewUrl: fixUrl(item.preview_url) || undefined,  // 동영상 프리뷰 URL 추가
+      previewUrl: fixUrl(item.preview_url) || undefined,  // 동영상 프리뷰 URL
+      fileUrl: fixUrl(item.file_url) || undefined,        // 원본 파일 URL (동영상 재생용)
+      subtitleUrl: fixUrl(item.subtitle_url) || undefined, // 자막 파일 URL
       createdAt: new Date(item.created_at),
       size: item.file_size,
     };

@@ -10,6 +10,8 @@ export interface LibraryItem {
   thumbnail?: string;
   preview?: string;
   previewUrl?: string;  // 동영상 프리뷰 URL
+  fileUrl?: string;     // 원본 파일 URL (동영상 재생용)
+  subtitleUrl?: string; // 자막 파일 URL (VTT 형식)
   createdAt: Date;
   size?: number;
 }
