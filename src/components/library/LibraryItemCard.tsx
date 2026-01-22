@@ -34,15 +34,21 @@ export function LibraryItemCard({
   // 호버 핸들러
   const handleMouseEnter = () => {
     setIsHovered(true);
-    if (videoRef.current && item.previewUrl) {
-      videoRef.current.play().catch(() => {
-        // 자동 재생 실패 시 무시
-      });
-    }
+    const videoUrl = item.previewUrl || item.fileUrl;
+    console.log('🎬 호버 시작:', {
+      type: item.type,
+      previewUrl: item.previewUrl,
+      fileUrl: item.fileUrl,
+      usingUrl: videoUrl,
+      hasVideoRef: !!videoRef.current
+    });
+    // videoRef는 비디오 엘리먼트가 마운트된 후에 설정되므로
+    // onLoadedData에서 재생 시도
   };
 
   const handleMouseLeave = () => {
     setIsHovered(false);
+    console.log('🎬 호버 종료');
     if (videoRef.current) {
       videoRef.current.pause();
       videoRef.current.currentTime = 0;
@@ -98,30 +104,52 @@ export function LibraryItemCard({
 
       <div className="relative aspect-[4/3] bg-secondary/30 overflow-hidden">
         {/* 동영상이고 프리뷰 URL이 있으면 호버 시 비디오 재생 */}
-        {item.type === "video" && item.previewUrl && isHovered ? (
+        {item.type === "video" && (item.previewUrl || item.fileUrl) && isHovered ? (
           <video
             ref={videoRef}
-            src={item.previewUrl}
+            src={item.previewUrl || item.fileUrl}
             className="w-full h-full object-cover"
             muted
             loop
             playsInline
+            autoPlay
+            crossOrigin="anonymous"
+            onLoadedData={() => {
+              console.log('✅ 비디오 로드 완료:', item.previewUrl || item.fileUrl);
+              // 로드 완료 후 재생 시도
+              if (videoRef.current) {
+                videoRef.current.play().catch((error) => {
+                  console.error('❌ 자동 재생 실패:', error);
+                });
+              }
+            }}
+            onError={(e) => {
+              console.error('❌ 비디오 로드 실패:', item.previewUrl || item.fileUrl, e);
+            }}
           />
         ) : item.thumbnail ? (
           <img
             src={item.thumbnail}
             alt={item.name}
             className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+            crossOrigin="anonymous"
+            onError={(e) => {
+              console.error('카드 이미지 로드 실패:', item.thumbnail);
+              e.currentTarget.style.display = 'none';
+            }}
+            onLoad={() => {
+              console.log('✅ 카드 이미지 로드 성공:', item.thumbnail);
+            }}
           />
-        ) : item.type === "video" ? (
-          // 동영상인데 썸네일 없으면 처리 중 표시
-          <div className="w-full h-full flex flex-col items-center justify-center">
-            <Video className="w-10 h-10 text-ink/30 animate-pulse" />
-            <span className="text-xs text-ink/50 mt-2">썸네일 생성 중...</span>
-          </div>
         ) : (
-          <div className="w-full h-full flex items-center justify-center">
-            <IconComponent className="w-10 h-10 text-ink/30" />
+          // 썸네일이 없으면 타입에 따라 처리 중 표시
+          <div className="w-full h-full flex flex-col items-center justify-center">
+            <IconComponent className="w-10 h-10 text-ink/30 animate-pulse" />
+            <span className="text-xs text-ink/50 mt-2">
+              {item.type === "video" ? "썸네일 생성 중..." : 
+               item.type === "image" ? "이미지 처리 중..." : 
+               "파일 처리 중..."}
+            </span>
           </div>
         )}
       </div>

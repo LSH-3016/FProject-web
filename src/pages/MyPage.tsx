@@ -7,13 +7,12 @@ import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { toast } from "@/hooks/use-toast";
 import {
   User,
-  MessageCircle,
-  AlertTriangle,
   Edit,
   LogOut,
   Lock,
   X,
   Loader2,
+  AlertTriangle,
 } from "lucide-react";
 
 const cn = (...classes: Array<string | false | null | undefined>) =>
@@ -28,18 +27,6 @@ interface MenuItem {
 }
 
 const menuItems: MenuItem[] = [
-  {
-    id: "inquiry",
-    label: "문의",
-    icon: MessageCircle,
-    description: "궁금한 점을 물어보세요",
-  },
-  {
-    id: "report",
-    label: "회원 신고",
-    icon: AlertTriangle,
-    description: "부적절한 활동을 신고하세요",
-  },
   {
     id: "edit",
     label: "정보 수정",
@@ -77,10 +64,6 @@ const MyPage = () => {
   const [isWithdrawCompleteOpen, setIsWithdrawCompleteOpen] = useState(false);
   const [isLogoutConfirmOpen, setIsLogoutConfirmOpen] = useState(false);
   const [isLogoutCompleteOpen, setIsLogoutCompleteOpen] = useState(false);
-  const [isReportOpen, setIsReportOpen] = useState(false);
-  const [isReportCompleteOpen, setIsReportCompleteOpen] = useState(false);
-  const [isInquiryOpen, setIsInquiryOpen] = useState(false);
-  const [isInquiryCompleteOpen, setIsInquiryCompleteOpen] = useState(false);
   const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
   const [isChangePasswordCompleteOpen, setIsChangePasswordCompleteOpen] = useState(false);
   const [isVerifyCodeOpen, setIsVerifyCodeOpen] = useState(false);
@@ -90,15 +73,6 @@ const MyPage = () => {
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  
-  // Report form state
-  const [reportedUserId, setReportedUserId] = useState("");
-  const [reportReason, setReportReason] = useState<'spam' | 'harassment' | 'inappropriate_content' | 'other'>('spam');
-  const [reportDescription, setReportDescription] = useState("");
-  
-  // Inquiry form state
-  const [inquirySubject, setInquirySubject] = useState("");
-  const [inquiryMessage, setInquiryMessage] = useState("");
   
   // 프로필 정보 상태 (백엔드 API에서 가져옴)
   const [profileData, setProfileData] = useState<{
@@ -364,159 +338,6 @@ const MyPage = () => {
     setIsLogoutCompleteOpen(false);
   };
 
-  const closeReportModal = () => {
-    setIsReportOpen(false);
-    setReportedUserId("");
-    setReportReason('spam');
-    setReportDescription("");
-  };
-
-  const handleReportSubmit = async () => {
-    if (!userId) {
-      toast({
-        title: "오류",
-        description: "사용자 인증 정보가 없습니다.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (!reportedUserId.trim()) {
-      toast({
-        title: "오류",
-        description: "신고할 회원의 닉네임 또는 아이디를 입력해주세요.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    try {
-      setIsLoading(true);
-      const token = getAuthToken();
-      if (!token) {
-        toast({
-          title: "오류",
-          description: "인증 토큰을 찾을 수 없습니다. 다시 로그인해주세요.",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      const authApiUrl = `${import.meta.env.VITE_API_URL || "https://api.aws11.shop"}${import.meta.env.AUTH_API_PREFIX || "/auth"}`;
-      const response = await fetch(`${authApiUrl}/user/report`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          reported_user_identifier: reportedUserId,
-          reason: reportReason,
-          description: reportDescription || undefined,
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || '신고 접수에 실패했습니다.');
-      }
-
-      setIsReportOpen(false);
-      setReportedUserId("");
-      setReportReason('spam');
-      setReportDescription("");
-      setIsReportCompleteOpen(true);
-    } catch (error) {
-      console.error("신고 접수 실패:", error);
-      toast({
-        title: "신고 접수 실패",
-        description: error instanceof Error ? error.message : "신고 접수에 실패했습니다. 다시 시도해주세요.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const closeReportComplete = () => {
-    setIsReportCompleteOpen(false);
-  };
-
-  const closeInquiryModal = () => {
-    setIsInquiryOpen(false);
-    setInquirySubject("");
-    setInquiryMessage("");
-  };
-
-  const handleInquirySubmit = async () => {
-    if (!userId) {
-      toast({
-        title: "오류",
-        description: "사용자 인증 정보가 없습니다.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (!inquirySubject.trim() || !inquiryMessage.trim()) {
-      toast({
-        title: "오류",
-        description: "제목과 문의 내용을 모두 입력해주세요.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    try {
-      setIsLoading(true);
-      const token = getAuthToken();
-      if (!token) {
-        toast({
-          title: "오류",
-          description: "인증 토큰을 찾을 수 없습니다. 다시 로그인해주세요.",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      const authApiUrl = `${import.meta.env.VITE_API_URL || "https://api.aws11.shop"}${import.meta.env.AUTH_API_PREFIX || "/auth"}`;
-      const response = await fetch(`${authApiUrl}/user/inquiry`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          subject: inquirySubject,
-          message: inquiryMessage,
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || '문의 접수에 실패했습니다.');
-      }
-
-      setIsInquiryOpen(false);
-      setInquirySubject("");
-      setInquiryMessage("");
-      setIsInquiryCompleteOpen(true);
-    } catch (error) {
-      console.error("문의 접수 실패:", error);
-      toast({
-        title: "문의 접수 실패",
-        description: error instanceof Error ? error.message : "문의 접수에 실패했습니다. 다시 시도해주세요.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const closeInquiryComplete = () => {
-    setIsInquiryCompleteOpen(false);
-  };
-
   const toggleAssistant = () => {
     // Removed assistant feature
   };
@@ -755,12 +576,6 @@ const MyPage = () => {
                         if (item.id === "edit") {
                           navigate("/edit-profile");
                         }
-                        if (item.id === "report") {
-                          setIsReportOpen(true);
-                        }
-                        if (item.id === "inquiry") {
-                          setIsInquiryOpen(true);
-                        }
                         if (item.id === "changePassword") {
                           setIsChangePasswordOpen(true);
                         }
@@ -963,256 +778,6 @@ const MyPage = () => {
               type="button"
               className="mt-5 w-full rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
               onClick={closeLogoutComplete}
-            >
-              확인
-            </button>
-          </div>
-        </div>
-      )}
-
-      {isReportOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
-          <button
-            type="button"
-            className="absolute inset-0 bg-black/60"
-            aria-label="닫기"
-            onClick={closeReportModal}
-          />
-          <div className="relative w-full max-w-lg bg-card rounded-xl shadow-xl border border-border p-6">
-            <button
-              type="button"
-              className="absolute right-4 top-4 text-muted-foreground hover:text-foreground transition-colors"
-              onClick={closeReportModal}
-              aria-label="닫기"
-            >
-              <X className="w-5 h-5" />
-            </button>
-
-            <div className="flex items-center gap-2 mb-2">
-              <AlertTriangle className="w-5 h-5 text-red-500" />
-              <h3 className="font-semibold text-foreground">회원 신고</h3>
-            </div>
-            <p className="text-sm text-muted-foreground mb-6">
-              신고 대상과 사유를 입력해 주세요.
-            </p>
-
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <label
-                  htmlFor="report-userid"
-                  className="text-sm font-medium text-foreground"
-                >
-                  닉네임 또는 회원 아이디 신고 *
-                </label>
-                <input
-                  id="report-userid"
-                  name="report-userid"
-                  type="text"
-                  value={reportedUserId}
-                  onChange={(e) => setReportedUserId(e.target.value)}
-                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  placeholder="닉네임 또는 아이디를 입력하세요"
-                  required
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label
-                  htmlFor="report-reason-select"
-                  className="text-sm font-medium text-foreground"
-                >
-                  신고 사유 *
-                </label>
-                <select
-                  id="report-reason-select"
-                  value={reportReason}
-                  onChange={(e) => setReportReason(e.target.value as any)}
-                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  required
-                >
-                  <option value="spam">스팸</option>
-                  <option value="harassment">괴롭힘</option>
-                  <option value="inappropriate_content">부적절한 콘텐츠</option>
-                  <option value="other">기타</option>
-                </select>
-              </div>
-
-              <div className="space-y-2">
-                <label
-                  htmlFor="report-description"
-                  className="text-sm font-medium text-foreground"
-                >
-                  상세 설명 (선택사항)
-                </label>
-                <textarea
-                  id="report-description"
-                  name="report-description"
-                  value={reportDescription}
-                  onChange={(e) => setReportDescription(e.target.value)}
-                  rows={4}
-                  maxLength={1000}
-                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  placeholder="신고 사유를 상세히 입력하세요 (최대 1000자)"
-                />
-                <p className="text-xs text-muted-foreground text-right">
-                  {reportDescription.length} / 1000
-                </p>
-              </div>
-            </div>
-
-            <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-              <button
-                type="button"
-                className="flex-1 rounded-lg border border-border px-4 py-2 text-sm font-semibold text-foreground transition-colors hover:bg-secondary/40"
-                onClick={closeReportModal}
-              >
-                취소
-              </button>
-              <button
-                type="button"
-                className="flex-1 rounded-lg bg-red-500 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-600"
-                onClick={handleReportSubmit}
-              >
-                신고
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {isReportCompleteOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
-          <button
-            type="button"
-            className="absolute inset-0 bg-black/60"
-            aria-label="닫기"
-            onClick={closeReportComplete}
-          />
-          <div className="relative w-full max-w-sm bg-card rounded-xl shadow-xl border border-border p-6 text-center">
-            <p className="text-sm text-foreground">
-              신고가 성공적으로 접수되었습니다.
-            </p>
-            <button
-              type="button"
-              className="mt-5 w-full rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
-              onClick={closeReportComplete}
-            >
-              확인
-            </button>
-          </div>
-        </div>
-      )}
-
-      {isInquiryOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
-          <button
-            type="button"
-            className="absolute inset-0 bg-black/60"
-            aria-label="닫기"
-            onClick={closeInquiryModal}
-          />
-          <div className="relative w-full max-w-lg bg-card rounded-xl shadow-xl border border-border p-6">
-            <button
-              type="button"
-              className="absolute right-4 top-4 text-muted-foreground hover:text-foreground transition-colors"
-              onClick={closeInquiryModal}
-              aria-label="닫기"
-            >
-              <X className="w-5 h-5" />
-            </button>
-
-            <div className="flex items-center gap-2 mb-2">
-              <MessageCircle className="w-5 h-5 text-yellow-600" />
-              <h3 className="font-semibold text-foreground">문의</h3>
-            </div>
-            <p className="text-sm text-muted-foreground mb-6">
-              문의할 내용을 자유롭게 작성해주세요.
-            </p>
-
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <label
-                  htmlFor="inquiry-subject"
-                  className="text-sm font-medium text-foreground"
-                >
-                  제목 *
-                </label>
-                <input
-                  id="inquiry-subject"
-                  name="inquiry-subject"
-                  type="text"
-                  value={inquirySubject}
-                  onChange={(e) => setInquirySubject(e.target.value)}
-                  maxLength={200}
-                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  placeholder="문의 제목을 입력하세요 (최대 200자)"
-                  required
-                />
-                <p className="text-xs text-muted-foreground text-right">
-                  {inquirySubject.length} / 200
-                </p>
-              </div>
-
-              <div className="space-y-2">
-                <label
-                  htmlFor="inquiry-message"
-                  className="text-sm font-medium text-foreground"
-                >
-                  문의 내용 *
-                </label>
-                <textarea
-                  id="inquiry-message"
-                  name="inquiry-message"
-                  value={inquiryMessage}
-                  onChange={(e) => setInquiryMessage(e.target.value)}
-                  rows={5}
-                  maxLength={2000}
-                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  placeholder="문의 내용을 입력하세요 (최대 2000자)"
-                  required
-                />
-                <p className="text-xs text-muted-foreground text-right">
-                  {inquiryMessage.length} / 2000
-                </p>
-              </div>
-            </div>
-
-            <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-              <button
-                type="button"
-                className="flex-1 rounded-lg border border-border px-4 py-2 text-sm font-semibold text-foreground transition-colors hover:bg-secondary/40"
-                onClick={closeInquiryModal}
-              >
-                취소
-              </button>
-              <button
-                type="button"
-                className="flex-1 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
-                onClick={handleInquirySubmit}
-              >
-                문의
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {isInquiryCompleteOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
-          <button
-            type="button"
-            className="absolute inset-0 bg-black/60"
-            aria-label="닫기"
-            onClick={closeInquiryComplete}
-          />
-          <div className="relative w-full max-w-sm bg-card rounded-xl shadow-xl border border-border p-6 text-center">
-            <p className="text-sm text-foreground">
-              문의가 성공적으로 접수되었습니다.
-            </p>
-            <button
-              type="button"
-              className="mt-5 w-full rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
-              onClick={closeInquiryComplete}
             >
               확인
             </button>

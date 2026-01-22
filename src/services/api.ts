@@ -24,6 +24,7 @@ interface ApiLibraryItem {
   thumbnail_url?: string | null;
   preview_url?: string | null;  // 동영상 프리뷰 URL
   subtitle_url?: string | null; // 자막 파일 URL
+  mime_type?: string | null;    // MIME 타입 (백엔드에서 제공 시)
 }
 
 interface PresignedUrlResponse {
@@ -341,12 +342,25 @@ class ApiService {
       return url.replace('https://library.aws11.shop/api/v1', `${import.meta.env.VITE_API_URL || "https://api.aws11.shop"}${import.meta.env.VITE_LIBRARY_API_PREFIX || "/library"}`);
     };
 
+    // 타입별로 썸네일 처리
+    let thumbnailUrl: string | undefined;
+    if (item.type === "image") {
+      // 이미지: file_url을 썸네일로 사용
+      thumbnailUrl = fixUrl(item.file_url);
+    } else if (item.type === "video") {
+      // 동영상: thumbnail_url만 사용 (없으면 undefined = "썸네일 생성중" 표시)
+      thumbnailUrl = fixUrl(item.thumbnail_url);
+    } else {
+      // document, file: 썸네일 없음
+      thumbnailUrl = undefined;
+    }
+
     return {
       id: item.id,
       name: item.name,
       type: item.type,
       visibility: item.visibility,
-      thumbnail: fixUrl(item.thumbnail_url) || undefined,
+      thumbnail: thumbnailUrl,
       preview: item.preview_text || undefined,
       previewUrl: fixUrl(item.preview_url) || undefined,  // 동영상 프리뷰 URL
       fileUrl: fixUrl(item.file_url) || undefined,        // 원본 파일 URL (동영상 재생용)

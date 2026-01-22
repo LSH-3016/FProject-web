@@ -370,6 +370,10 @@ const LibraryDetailPage = () => {
               src={previewItem.thumbnail}
               alt={previewItem.name}
               className="w-full h-full object-contain"
+              crossOrigin="anonymous"
+              onError={(e) => {
+                console.error('미리보기 이미지 로드 실패:', previewItem.thumbnail);
+              }}
             />
           ) : (
             <div className="p-8 text-center font-serif text-ink">

@@ -351,6 +351,14 @@ const LibraryPage = () => {
                         src={item.latestItem.thumbnail}
                         alt={item.latestItem.name}
                         className="absolute inset-0 h-full w-full object-cover"
+                        crossOrigin="anonymous"
+                        onError={(e) => {
+                          console.error('이미지 로드 실패:', item.latestItem?.thumbnail);
+                          e.currentTarget.style.display = 'none';
+                        }}
+                        onLoad={() => {
+                          console.log('✅ 이미지 로드 성공:', item.latestItem?.thumbnail);
+                        }}
                       />
                     ) : (
                       <div className="absolute inset-0 flex items-center justify-center">

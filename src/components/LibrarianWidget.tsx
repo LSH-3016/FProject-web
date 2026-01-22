@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { X, Send } from 'lucide-react';
+import { useCurrentUser } from '@/hooks/useCurrentUser';
 
 interface LibrarianWidgetProps {
   initialPosition?: { x: number; y: number } | 'bottom-right' | 'bottom-left';
@@ -13,6 +14,7 @@ export const LibrarianWidget: React.FC<LibrarianWidgetProps> = ({
   initialPosition = 'bottom-right',
   size = { width: 200, height: 280 }
 }) => {
+  const { userId } = useCurrentUser();
   const containerRef = useRef<HTMLDivElement>(null);
   const widgetRef = useRef<HTMLDivElement>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -34,7 +36,6 @@ export const LibrarianWidget: React.FC<LibrarianWidgetProps> = ({
   const chatEndRef = useRef<HTMLDivElement>(null);
   const hasDragged = useRef(false);
   const [scale, setScale] = useState(1); // 줌 스케일
-  const [sessionId] = useState(() => `session-${Date.now()}`); // 세션 ID
   const [isTyping, setIsTyping] = useState(false); // AI 응답 대기 중
 
   // 초기 위치 계산
@@ -66,7 +67,7 @@ export const LibrarianWidget: React.FC<LibrarianWidgetProps> = ({
     setShowQuickReplies(false);
   };
 
-  // 메시지 전송 - Bedrock Agent API 연결
+  // 메시지 전송 - Agent API 연결
   const handleSend = async () => {
     if (!input.trim() || isTyping) return;
     
@@ -79,14 +80,24 @@ export const LibrarianWidget: React.FC<LibrarianWidgetProps> = ({
     try {
       // 환경 변수에서 API URL 가져오기
       const apiUrl = import.meta.env.VITE_API_URL || 'https://api.aws11.shop';
-      const chatApiPrefix = import.meta.env.VITE_CHAT_API_PREFIX || '/chat';
       
-      const response = await fetch(`${apiUrl}${chatApiPrefix}/chat`, {
+      // 현재 날짜 (YYYY-MM-DD 형식)
+      const currentDate = new Date().toISOString().split('T')[0];
+      
+      console.log('Agent API 요청:', {
+        url: `${apiUrl}/agent/question`,
+        content: userMessage,
+        user_id: userId || 'anonymous',
+        current_date: currentDate
+      });
+      
+      const response = await fetch(`${apiUrl}/agent/question`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
-          message: userMessage,
-          session_id: sessionId 
+          content: userMessage,
+          user_id: userId || 'anonymous',
+          current_date: currentDate
         })
       });
 
@@ -95,9 +106,13 @@ export const LibrarianWidget: React.FC<LibrarianWidgetProps> = ({
       }
 
       const data = await response.json();
-      setMessages(prev => [...prev, { role: 'bot', text: data.reply || '응답을 받지 못했어요.' }]);
+      console.log('Agent API 응답:', data);
+      
+      // API 응답 구조에 따라 답변 추출
+      const botReply = data.answer || data.response || data.reply || '응답을 받지 못했어요.';
+      setMessages(prev => [...prev, { role: 'bot', text: botReply }]);
     } catch (error) {
-      console.error('Chat API error:', error);
+      console.error('Agent API error:', error);
       setMessages(prev => [...prev, { 
         role: 'bot', 
         text: '서버와 연결할 수 없어요. 잠시 후 다시 시도해주세요.' 
