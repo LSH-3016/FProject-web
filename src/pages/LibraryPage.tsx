@@ -228,13 +228,24 @@ const LibraryPage = () => {
 
   return (
     <MainLayout>
-      <div className="min-h-screen py-12 px-4">
-        <div className="max-w-5xl mx-auto">
+      <div className="min-h-screen py-12 px-4 relative">
+        {/* 배경 이미지 레이어 - MainLayout 위에 표시 */}
+        <div 
+          className="fixed inset-0 bg-cover bg-center pointer-events-none"
+          style={{ 
+            backgroundImage: 'url(/library_bg.png)',
+            zIndex: 0
+          }}
+        />
+        {/* 반투명 오버레이 */}
+        <div 
+          className="fixed inset-0 bg-background/70 pointer-events-none"
+          style={{ zIndex: 1 }}
+        />
+        
+        <div className="max-w-5xl mx-auto relative" style={{ zIndex: 10 }}>
           {/* Header */}
           <header className="text-center mb-12 animate-fade-in">
-            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-secondary mb-4">
-              <FolderOpen className="w-8 h-8 text-gold" />
-            </div>
             <h1 className="font-serif text-3xl text-primary mb-2 gold-accent">
               {userDisplayName}님의 라이브러리
             </h1>
@@ -279,7 +290,7 @@ const LibraryPage = () => {
             <div ref={uploadMenuRef} className="relative">
               <button
                 type="button"
-                className="vintage-btn px-5 py-3 rounded-md flex items-center gap-2 font-serif text-sepia hover:text-gold transition-colors"
+                className="bg-transparent border-2 border-amber-800/20 px-5 py-3 rounded-md flex items-center gap-2 font-serif text-amber-100 hover:bg-amber-900/20 hover:border-amber-800/40 transition-colors"
                 aria-haspopup="menu"
                 aria-expanded={isUploadMenuOpen}
                 onClick={() => {
@@ -287,38 +298,38 @@ const LibraryPage = () => {
                 }}
               >
                 <img src="/dropdown.png" alt="드롭다운" className="w-12 h-12" />
-                <span className="text-xl"> 추가 </span>
+                <span className="text-xl font-semibold"> 추가 </span>
               </button>
 
               {isUploadMenuOpen && (
                 <div
                   role="menu"
-                  className="absolute right-0 mt-2 w-44 rounded-md border border-ink/10 bg-background/95 shadow-page backdrop-blur-sm z-20"
+                  className="absolute right-0 mt-2 w-44 rounded-lg border-3 border-amber-900/50 bg-amber-50 shadow-2xl backdrop-blur-md z-20 overflow-hidden"
                 >
                   <button
                     type="button"
-                    className="w-full text-left px-4 py-2 text-base font-serif text-sepia hover:bg-gold/10 hover:text-gold transition-colors"
+                    className="w-full text-left px-5 py-3.5 text-base font-serif font-semibold text-amber-950 hover:bg-amber-200 hover:text-amber-950 transition-colors border-b-2 border-amber-900/20"
                     onClick={() => handleUploadClick("video")}
                   >
                     동영상
                   </button>
                   <button
                     type="button"
-                    className="w-full text-left px-4 py-2 text-base font-serif text-sepia hover:bg-gold/10 hover:text-gold transition-colors"
+                    className="w-full text-left px-5 py-3.5 text-base font-serif font-semibold text-amber-950 hover:bg-amber-200 hover:text-amber-950 transition-colors border-b-2 border-amber-900/20"
                     onClick={() => handleUploadClick("image")}
                   >
                     사진
                   </button>
                   <button
                     type="button"
-                    className="w-full text-left px-4 py-2 text-base font-serif text-sepia hover:bg-gold/10 hover:text-gold transition-colors"
+                    className="w-full text-left px-5 py-3.5 text-base font-serif font-semibold text-amber-950 hover:bg-amber-200 hover:text-amber-950 transition-colors border-b-2 border-amber-900/20"
                     onClick={() => handleUploadClick("document")}
                   >
                     문서
                   </button>
                   <button
                     type="button"
-                    className="w-full text-left px-4 py-2 text-base font-serif text-sepia hover:bg-gold/10 hover:text-gold transition-colors"
+                    className="w-full text-left px-5 py-3.5 text-base font-serif font-semibold text-amber-950 hover:bg-amber-200 hover:text-amber-950 transition-colors"
                     onClick={() => handleUploadClick("file")}
                   >
                     파일

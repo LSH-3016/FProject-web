@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { Check, File, FileText, Image, Video } from "lucide-react";
+import { Check, File, FileText, Image, Video, Edit2 } from "lucide-react";
 import { LibraryItem } from "@/types/library";
 import { cn } from "@/lib/utils";
 
@@ -16,6 +16,7 @@ interface LibraryItemCardProps {
   isSelected: boolean;
   onSelect: (id: string) => void;
   onOpen?: (item: LibraryItem) => void;
+  onEditTitle?: (id: string, currentTitle: string) => void;
 }
 
 export function LibraryItemCard({
@@ -24,6 +25,7 @@ export function LibraryItemCard({
   isSelected,
   onSelect,
   onOpen,
+  onEditTitle,
 }: LibraryItemCardProps) {
   const IconComponent = iconMap[item.type];
   
@@ -69,6 +71,12 @@ export function LibraryItemCard({
       month: "long",
       day: "numeric",
     });
+
+  // 제목 수정 핸들러 - 부모 컴포넌트로 전달만
+  const handleEditTitle = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onEditTitle?.(item.id, item.name);
+  };
 
   return (
     <div
@@ -127,6 +135,18 @@ export function LibraryItemCard({
               console.error('❌ 비디오 로드 실패:', item.previewUrl || item.fileUrl, e);
             }}
           />
+        ) : item.type === "document" ? (
+          // 문서 타입: 고정 썸네일
+          <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-blue-50 to-blue-100">
+            <FileText className="w-16 h-16 text-blue-600 mb-2" />
+            <span className="text-xs text-blue-700 font-serif">문서</span>
+          </div>
+        ) : item.type === "file" ? (
+          // 파일 타입: 고정 썸네일
+          <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100">
+            <File className="w-16 h-16 text-gray-600 mb-2" />
+            <span className="text-xs text-gray-700 font-serif">파일</span>
+          </div>
         ) : item.thumbnail ? (
           <img
             src={item.thumbnail}
@@ -142,7 +162,7 @@ export function LibraryItemCard({
             }}
           />
         ) : (
-          // 썸네일이 없으면 타입에 따라 처리 중 표시
+          // 썸네일이 없으면 타입에 따라 처리 중 표시 (이미지/동영상만)
           <div className="w-full h-full flex flex-col items-center justify-center">
             <IconComponent className="w-10 h-10 text-ink/30 animate-pulse" />
             <span className="text-xs text-ink/50 mt-2">
@@ -155,7 +175,18 @@ export function LibraryItemCard({
       </div>
 
       <div className="p-4 border-t border-ink/10 bg-background/10">
-        <h3 className="font-serif text-sm text-ink truncate">{item.name}</h3>
+        <div className="flex items-center justify-between gap-2">
+          <h3 className="font-serif text-sm text-ink truncate flex-1">{item.name}</h3>
+          {!isSelectionMode && item.type === "video" && (
+            <button
+              onClick={handleEditTitle}
+              className="p-1 hover:bg-gold/10 rounded transition-colors"
+              title="제목 수정"
+            >
+              <Edit2 className="w-3.5 h-3.5 text-ink/60 hover:text-gold" />
+            </button>
+          )}
+        </div>
         <div className="flex items-center justify-between mt-1">
           <p className="font-serif text-xs text-ink/50">{formatDate(item.createdAt)}</p>
           {item.size && (

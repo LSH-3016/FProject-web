@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Progress } from "@/components/ui/progress";
 import { apiService } from "@/services/api";
 import { useToast } from "@/hooks/use-toast";
+import { VideoTitleModal } from "./VideoTitleModal";
 
 interface AddItemModalProps {
   isOpen: boolean;
@@ -28,6 +29,9 @@ export function AddItemModal({
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [isTitleModalOpen, setIsTitleModalOpen] = useState(false);
+  const [uploadedItemId, setUploadedItemId] = useState<string | null>(null);
+  const [uploadedItem, setUploadedItem] = useState<any>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
@@ -88,15 +92,6 @@ export function AddItemModal({
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     
-    if (!name.trim()) {
-      toast({
-        title: "오류",
-        description: "파일 이름을 입력해주세요.",
-        variant: "destructive",
-      });
-      return;
-    }
-
     if (!selectedFile) {
       toast({
         title: "오류",
@@ -106,6 +101,74 @@ export function AddItemModal({
       return;
     }
 
+    // 동영상인 경우 먼저 업로드 후 제목 입력 모달 표시
+    if (itemType === "video") {
+      await performUploadWithoutTitle();
+      return;
+    }
+
+    // 동영상이 아닌 경우 기존 로직
+    if (!name.trim()) {
+      toast({
+        title: "오류",
+        description: "파일 이름을 입력해주세요.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    await performUpload(name.trim());
+  };
+
+  // 동영상 업로드 (제목 없이)
+  const performUploadWithoutTitle = async () => {
+    if (!selectedFile) return;
+
+    setIsUploading(true);
+    setUploadProgress(0);
+
+    try {
+      // 파일명 그대로 임시 제목으로 사용
+      const tempTitle = selectedFile.name;
+      
+      // API 서비스를 통해 파일 업로드
+      const uploadedItem = await apiService.uploadFile(
+        selectedFile,
+        tempTitle,
+        "private",
+        (progress) => {
+          setUploadProgress(progress);
+        }
+      );
+
+      // 업로드된 아이템 정보 저장
+      setUploadedItemId(uploadedItem.id);
+      setUploadedItem(uploadedItem);
+      setName(selectedFile.name.replace(/\.[^/.]+$/, "")); // 확장자 제거한 이름을 기본값으로
+      
+      toast({
+        title: "업로드 완료",
+        description: "동영상 제목을 입력해주세요.",
+      });
+
+      // 제목 입력 모달 열기
+      setIsTitleModalOpen(true);
+    } catch (error) {
+      console.error("업로드 실패:", error);
+      toast({
+        title: "업로드 실패",
+        description: error instanceof Error ? error.message : "파일 업로드 중 오류가 발생했습니다.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  // 실제 업로드 수행 (동영상 아닌 경우)
+  const performUpload = async (finalTitle: string) => {
+    if (!selectedFile) return;
+
     setIsUploading(true);
     setUploadProgress(0);
 
@@ -113,7 +176,7 @@ export function AddItemModal({
       // API 서비스를 통해 파일 업로드
       const uploadedItem = await apiService.uploadFile(
         selectedFile,
-        name.trim(),
+        finalTitle,
         "private",
         (progress) => {
           setUploadProgress(progress);
@@ -122,20 +185,14 @@ export function AddItemModal({
 
       toast({
         title: "업로드 완료",
-        description: `${name}이(가) 성공적으로 업로드되었습니다.`,
+        description: `${finalTitle}이(가) 성공적으로 업로드되었습니다.`,
       });
 
       // 부모 컴포넌트에 새 아이템 전달
       onAdd(uploadedItem);
       
       // 폼 초기화
-      setName("");
-      setSelectedFile(null);
-      setUploadProgress(0);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = "";
-      }
-      
+      resetForm();
       onClose();
     } catch (error) {
       console.error("업로드 실패:", error);
@@ -149,6 +206,48 @@ export function AddItemModal({
     }
   };
 
+  // 동영상 제목 확인 후 제목 업데이트
+  const handleTitleConfirm = async (title: string) => {
+    if (!uploadedItemId || !uploadedItem) return;
+
+    try {
+      // 제목 업데이트 API 호출
+      await apiService.updateLibraryItem(uploadedItemId, { name: title });
+      
+      toast({
+        title: "제목 저장 완료",
+        description: `${title}이(가) 저장되었습니다.`,
+      });
+
+      // 업데이트된 아이템 정보로 부모에 전달
+      onAdd({ ...uploadedItem, name: title });
+      
+      // 폼 초기화
+      resetForm();
+      setIsTitleModalOpen(false);
+      onClose();
+    } catch (error) {
+      console.error("제목 저장 실패:", error);
+      toast({
+        title: "저장 실패",
+        description: "제목 저장 중 오류가 발생했습니다.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // 폼 초기화
+  const resetForm = () => {
+    setName("");
+    setSelectedFile(null);
+    setUploadProgress(0);
+    setUploadedItemId(null);
+    setUploadedItem(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+
   // 모달 닫기 처리
   const handleClose = () => {
     if (isUploading) {
@@ -159,6 +258,13 @@ export function AddItemModal({
       });
       return;
     }
+    
+    // 제목 입력 모달이 열려있으면 닫지 않음
+    if (isTitleModalOpen) {
+      return;
+    }
+    
+    resetForm();
     onClose();
   };
 
@@ -233,20 +339,22 @@ export function AddItemModal({
             )}
           </div>
 
-          {/* 파일 이름 입력 */}
-          <div className="space-y-2">
-            <Label htmlFor="name" className="text-ink/80">
-              표시 이름
-            </Label>
-            <Input
-              id="name"
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-              placeholder={`${typeLabel} 이름을 입력하세요`}
-              className="bg-background"
-              disabled={isUploading}
-            />
-          </div>
+          {/* 파일 이름 입력 - 동영상이 아닐 때만 표시 */}
+          {itemType !== "video" && (
+            <div className="space-y-2">
+              <Label htmlFor="name" className="text-ink/80">
+                표시 이름
+              </Label>
+              <Input
+                id="name"
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+                placeholder={`${typeLabel} 이름을 입력하세요`}
+                className="bg-background"
+                disabled={isUploading}
+              />
+            </div>
+          )}
 
           {/* 업로드 진행률 */}
           {isUploading && (
@@ -273,13 +381,27 @@ export function AddItemModal({
             <Button 
               type="submit" 
               className="flex-1" 
-              disabled={!name.trim() || !selectedFile || isUploading}
+              disabled={(!name.trim() && itemType !== "video") || !selectedFile || isUploading}
             >
-              {isUploading ? "업로드 중..." : "추가"}
+              {isUploading ? "업로드 중..." : itemType === "video" ? "업로드" : "추가"}
             </Button>
           </div>
         </form>
       </DialogContent>
+
+      {/* 동영상 제목 입력 모달 */}
+      <VideoTitleModal
+        isOpen={isTitleModalOpen}
+        onClose={() => {
+          setIsTitleModalOpen(false);
+          // 제목 입력 취소 시 업로드된 아이템 삭제 (선택사항)
+          // 또는 임시 제목으로 그대로 두기
+        }}
+        onConfirm={handleTitleConfirm}
+        defaultTitle={name}
+        mode="create"
+        itemId={uploadedItemId || undefined}
+      />
     </Dialog>
   );
 }

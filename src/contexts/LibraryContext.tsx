@@ -12,6 +12,7 @@ interface LibraryContextType {
   updateItemsVisibility: (itemIds: string[], visibility: LibraryItemVisibility) => void;
   deleteItems: (itemIds: string[]) => void;
   addItem: (item: LibraryItem) => void;
+  updateItem: (itemId: string, updates: Partial<LibraryItem>) => void;
   refreshItems: () => Promise<void>;
 }
 
@@ -157,6 +158,12 @@ export function LibraryProvider({ children }: { children: React.ReactNode }) {
     setItems((prev) => [item, ...prev]);
   }, []);
 
+  const updateItem = useCallback((itemId: string, updates: Partial<LibraryItem>) => {
+    setItems((prev) =>
+      prev.map((item) => (item.id === itemId ? { ...item, ...updates } : item))
+    );
+  }, []);
+
   const value = useMemo(
     () => ({
       items,
@@ -168,6 +175,7 @@ export function LibraryProvider({ children }: { children: React.ReactNode }) {
       updateItemsVisibility,
       deleteItems,
       addItem,
+      updateItem,
       refreshItems,
     }),
     [
@@ -180,6 +188,7 @@ export function LibraryProvider({ children }: { children: React.ReactNode }) {
       updateItemsVisibility,
       deleteItems,
       addItem,
+      updateItem,
       refreshItems,
     ]
   );

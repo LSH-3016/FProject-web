@@ -5,11 +5,14 @@ import { MainLayout } from "@/components/layout/MainLayout";
 import { LibraryItemCard } from "@/components/library/LibraryItemCard";
 import { DeleteConfirmModal } from "@/components/library/DeleteConfirmModal";
 import { AddItemModal } from "@/components/library/AddItemModal";
+import { VideoTitleModal } from "@/components/library/VideoTitleModal";
 import { useLibraryContext } from "@/contexts/LibraryContext";
 import { LibraryItem, LibraryItemType, LibraryTypeConfig } from "@/types/library";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useAuth } from "@/hooks/useAuth";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { apiService } from "@/services/api";
+import { useToast } from "@/hooks/use-toast";
 
 const libraryTypeConfigs: LibraryTypeConfig[] = [
   {
@@ -47,8 +50,9 @@ const LibraryDetailPage = () => {
   const navigate = useNavigate();
   const { isAuthenticated, isLoading: authLoading, isCognitoConfigured } = useAuth();
   const { displayName, isLoading: userLoading, userId } = useCurrentUser();
-  const { getItemsByType, deleteItems, addItem } = useLibraryContext();
+  const { getItemsByType, deleteItems, addItem, updateItem } = useLibraryContext();
   const menuRef = useRef<HTMLDivElement | null>(null);
+  const { toast } = useToast();
 
   const itemType = type as LibraryItemType;
   const config = libraryTypeConfigs.find((item) => item.type === itemType);
@@ -123,6 +127,8 @@ const LibraryDetailPage = () => {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [previewItem, setPreviewItem] = useState<LibraryItem | null>(null);
+  const [editingItemId, setEditingItemId] = useState<string | null>(null);
+  const [editingItemTitle, setEditingItemTitle] = useState<string>("");
 
   const items = useMemo(() => getItemsByType(itemType), [getItemsByType, itemType]);
 
@@ -198,10 +204,54 @@ const LibraryDetailPage = () => {
     }
   };
 
+  // 제목 수정 모달 열기
+  const handleOpenEditTitle = (itemId: string, currentTitle: string) => {
+    setEditingItemId(itemId);
+    setEditingItemTitle(currentTitle);
+  };
+
+  // 제목 수정 확인
+  const handleConfirmEditTitle = async (newTitle: string) => {
+    if (!editingItemId) return;
+
+    try {
+      await apiService.updateLibraryItem(editingItemId, { name: newTitle });
+      updateItem(editingItemId, { name: newTitle });
+      toast({
+        title: "제목 수정 완료",
+        description: "동영상 제목이 수정되었습니다.",
+      });
+    } catch (error) {
+      console.error("제목 수정 실패:", error);
+      toast({
+        title: "수정 실패",
+        description: "제목 수정 중 오류가 발생했습니다.",
+        variant: "destructive",
+      });
+    } finally {
+      setEditingItemId(null);
+      setEditingItemTitle("");
+    }
+  };
+
   return (
     <MainLayout>
-      <div className="min-h-screen py-12 px-4">
-        <div className="max-w-5xl mx-auto">
+      <div className="min-h-screen py-12 px-4 relative">
+        {/* 배경 이미지 레이어 - MainLayout 위에 표시 */}
+        <div 
+          className="fixed inset-0 bg-cover bg-center pointer-events-none"
+          style={{ 
+            backgroundImage: 'url(/library_bg.png)',
+            zIndex: 0
+          }}
+        />
+        {/* 반투명 오버레이 */}
+        <div 
+          className="fixed inset-0 bg-background/70 pointer-events-none"
+          style={{ zIndex: 1 }}
+        />
+        
+        <div className="max-w-5xl mx-auto relative" style={{ zIndex: 10 }}>
           <header className="flex items-center justify-between mb-8">
             <div className="flex items-center gap-3">
               <button
@@ -240,7 +290,7 @@ const LibraryDetailPage = () => {
                 <div ref={menuRef} className="relative">
                   <button
                     type="button"
-                    className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center text-ink hover:text-gold transition-colors"
+                    className="w-10 h-10 rounded-full bg-amber-100 border-2 border-amber-800/30 flex items-center justify-center text-amber-900 hover:bg-amber-200 hover:text-amber-950 hover:border-amber-800/50 transition-colors shadow-md"
                     onClick={() => setIsMenuOpen((prev) => !prev)}
                   >
                     <MoreVertical className="w-5 h-5" />
@@ -248,25 +298,25 @@ const LibraryDetailPage = () => {
                   {isMenuOpen && (
                     <div
                       role="menu"
-                      className="absolute right-0 mt-2 w-40 rounded-md border border-ink/10 bg-background/95 shadow-page backdrop-blur-sm z-20"
+                      className="absolute right-0 mt-2 w-44 rounded-lg border-3 border-amber-900/50 bg-amber-50 shadow-2xl backdrop-blur-md z-20 overflow-hidden"
                     >
                       <button
                         type="button"
-                        className="w-full text-left px-4 py-2 text-sm font-serif text-sepia hover:bg-gold/10 hover:text-gold transition-colors"
+                        className="w-full text-left px-5 py-3.5 text-base font-serif font-semibold text-amber-950 hover:bg-amber-200 hover:text-amber-950 transition-colors border-b-2 border-amber-900/20"
                         onClick={() => {
                           setIsMenuOpen(false);
                           setIsAddModalOpen(true);
                         }}
                       >
-                        <Plus className="w-4 h-4 inline-block mr-2" />
+                        <Plus className="w-5 h-5 inline-block mr-2" />
                         추가
                       </button>
                       <button
                         type="button"
-                        className="w-full text-left px-4 py-2 text-sm font-serif text-red-800 hover:bg-red-100/50 hover:text-red-900 transition-colors"
+                        className="w-full text-left px-5 py-3.5 text-base font-serif font-semibold text-red-900 hover:bg-red-200 hover:text-red-950 transition-colors"
                         onClick={handleEnterDeleteMode}
                       >
-                        <Trash2 className="w-4 h-4 inline-block mr-2" />
+                        <Trash2 className="w-5 h-5 inline-block mr-2" />
                         삭제
                       </button>
                     </div>
@@ -302,6 +352,7 @@ const LibraryDetailPage = () => {
                     isSelected={selectedIds.includes(item.id)}
                     onSelect={handleToggleSelect}
                     onOpen={handleOpenPreview}
+                    onEditTitle={handleOpenEditTitle}
                   />
                 </div>
               ))}
@@ -382,6 +433,19 @@ const LibraryDetailPage = () => {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* 동영상 제목 수정 모달 */}
+      <VideoTitleModal
+        isOpen={!!editingItemId}
+        onClose={() => {
+          setEditingItemId(null);
+          setEditingItemTitle("");
+        }}
+        onConfirm={handleConfirmEditTitle}
+        defaultTitle={editingItemTitle}
+        mode="edit"
+        itemId={editingItemId || undefined}
+      />
     </MainLayout>
   );
 };
