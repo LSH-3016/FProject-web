@@ -42,12 +42,14 @@ export function LibraryProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  // 썸네일 없는 동영상 아이템만 조회하여 업데이트하는 함수
+  // 썸네일 없는 동영상 아이템 및 제목 생성 중인 아이템 조회하여 업데이트하는 함수
   const checkPendingThumbnails = useCallback(async () => {
     // 썸네일 없는 동영상 아이템 찾기
     const pendingVideoItems = items.filter((item) => item.type === "video" && !item.thumbnail);
+    // 제목 생성 중인 아이템 찾기
+    const pendingTitleItems = items.filter((item) => item.name === "제목 생성 중...");
     
-    if (pendingVideoItems.length === 0) {
+    if (pendingVideoItems.length === 0 && pendingTitleItems.length === 0) {
       // 대기 중인 아이템 없으면 polling 중지
       if (pollingIntervalRef.current) {
         clearInterval(pollingIntervalRef.current);
@@ -60,18 +62,32 @@ export function LibraryProvider({ children }: { children: React.ReactNode }) {
       // 각 아이템의 최신 정보 조회
       const { items: freshItems } = await apiService.getMyLibraryItems(1, 100);
       
-      // 썸네일이 생성된 아이템 업데이트
+      // 썸네일이 생성된 아이템 및 제목이 업데이트된 아이템 갱신
       setItems((prev) =>
         prev.map((item) => {
           const freshItem = freshItems.find((f) => f.id === item.id);
-          if (freshItem && item.type === "video" && !item.thumbnail && freshItem.thumbnail) {
-            return { ...item, thumbnail: freshItem.thumbnail };
+          if (freshItem) {
+            const updates: Partial<LibraryItem> = {};
+            
+            // 썸네일 업데이트
+            if (item.type === "video" && !item.thumbnail && freshItem.thumbnail) {
+              updates.thumbnail = freshItem.thumbnail;
+            }
+            
+            // 제목 업데이트
+            if (item.name === "제목 생성 중..." && freshItem.name !== "제목 생성 중...") {
+              updates.name = freshItem.name;
+            }
+            
+            if (Object.keys(updates).length > 0) {
+              return { ...item, ...updates };
+            }
           }
           return item;
         })
       );
     } catch (err) {
-      console.error("썸네일 상태 확인 실패:", err);
+      console.error("썸네일/제목 상태 확인 실패:", err);
     }
   }, [items]);
 
@@ -81,11 +97,12 @@ export function LibraryProvider({ children }: { children: React.ReactNode }) {
     refreshItems();
   }, [refreshItems]);
 
-  // 썸네일 없는 동영상이 있으면 polling 시작
+  // 썸네일 없는 동영상 또는 제목 생성 중인 아이템이 있으면 polling 시작
   useEffect(() => {
     const hasPendingVideos = items.some((item) => item.type === "video" && !item.thumbnail);
+    const hasPendingTitles = items.some((item) => item.name === "제목 생성 중...");
     
-    if (hasPendingVideos && !pollingIntervalRef.current) {
+    if ((hasPendingVideos || hasPendingTitles) && !pollingIntervalRef.current) {
       // 10초마다 확인
       pollingIntervalRef.current = setInterval(checkPendingThumbnails, 10000);
     }

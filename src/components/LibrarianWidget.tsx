@@ -330,10 +330,14 @@ export const LibrarianWidget: React.FC<LibrarianWidgetProps> = ({
       {/* 챗봇 창 */}
       {isChatOpen && (
         <div 
-          className="chatbot-window absolute bottom-full left-0 mb-20 w-96 bg-amber-50/95 backdrop-blur-sm rounded-2xl shadow-2xl border-2 border-amber-700 overflow-hidden z-[100]"
+          className="chatbot-window absolute bottom-full mb-1 w-[29rem] bg-amber-50/95 backdrop-blur-sm rounded-2xl shadow-2xl border-2 border-amber-700 overflow-hidden z-[100]"
           onMouseDown={(e) => e.stopPropagation()}
           onClick={(e) => e.stopPropagation()}
-          style={{ cursor: 'default' }}
+          style={{ 
+            cursor: 'default',
+            left: '50%',
+            transform: 'translateX(-50%)'
+          }}
         >
           {/* 헤더 */}
           <div className="bg-amber-800 text-amber-100 px-4 py-3 flex items-center justify-between">
@@ -360,8 +364,8 @@ export const LibrarianWidget: React.FC<LibrarianWidgetProps> = ({
             </button>
           </div>
           
-          {/* 메시지 영역 - 세로 크기 원래대로 */}
-          <div className="h-48 overflow-y-auto p-3 space-y-3">
+          {/* 메시지 영역 */}
+          <div className="h-[21.25rem] overflow-y-auto p-3 space-y-3">
             {messages.map((msg, i) => (
               <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                 <div className={`max-w-[80%] px-3 py-2 rounded-2xl text-sm ${

@@ -234,7 +234,7 @@ const History = () => {
   };
 
   const clearHistory = async () => {
-    if (window.confirm(KOREAN_UI_TEXTS.confirmReset)) {
+    if (window.confirm("정말로 모든 기록을 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.")) {
       await historyDB.clear();
       setHistoryContent([]);
       setFilteredContent([]);
@@ -243,6 +243,12 @@ const History = () => {
       setAppState(AppState.IDLE);
       setFlipTrigger(0);
     }
+  };
+
+  const resetFilters = () => {
+    setSelectedTag('');
+    setQuery('');
+    setFilteredContent(historyContent);
   };
 
   const handleTagSelect = (tag: string) => {
@@ -542,12 +548,12 @@ const History = () => {
 
             {historyContent && historyContent.length > 0 && (
               <button
-                onClick={clearHistory}
-                className="text-amber-900/60 hover:text-red-900 bg-amber-100/80 hover:bg-red-100 px-2 py-1 rounded transition-colors text-xs flex items-center gap-1 font-serif"
-                title="Burn Book (Reset)"
+                onClick={resetFilters}
+                className="text-amber-900/60 hover:text-amber-900 bg-amber-100/80 hover:bg-amber-200 px-2 py-1 rounded transition-colors text-xs flex items-center gap-1 font-serif"
+                title="필터 초기화"
               >
-                <Trash2 className="w-3 h-3" />
-                <span>{KOREAN_UI_TEXTS.reset}</span>
+                <X className="w-3 h-3" />
+                <span>초기화</span>
               </button>
             )}
         </div>
