@@ -33,6 +33,29 @@ export class JournalApiService {
     }));
   }
 
+  // 메시지 직접 생성 (날짜 커스텀 가능)
+  async createMessage(userId: string, content: string, createdAt?: string): Promise<JournalEntry> {
+    const response = await fetch(`${this.apiBaseUrl}/messages`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        user_id: userId,
+        content: content,
+        created_at: createdAt || new Date().toISOString()
+      })
+    });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    return {
+      ...data,
+      created_at: new Date(data.created_at)
+    };
+  }
+
   // Flow API를 통한 입력 처리
   async processEntry(flowRequest: FlowRequest): Promise<FlowResponse> {
     const response = await fetch(`${this.apiBaseUrl}/process`, {

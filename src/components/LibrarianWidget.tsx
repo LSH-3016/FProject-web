@@ -27,10 +27,8 @@ export const LibrarianWidget: React.FC<LibrarianWidgetProps> = ({
 
   // 미리 정해진 질문과 답변
   const quickReplies = [
-    { question: '기록 검색하는 방법', answer: '상단의 검색창에 키워드를 입력하면 관련된 기록을 찾을 수 있어요. 날짜, 태그, 내용으로 검색 가능합니다!' },
-    { question: '태그 필터링', answer: '검색창 아래에 있는 태그 버튼들을 클릭하면 해당 태그의 기록만 볼 수 있어요. "전체"를 누르면 모든 기록이 표시됩니다.' },
-    { question: '최근 본 기록', answer: '검색창 아래 "최근 본 기록" 섹션에서 최근에 본 날짜들을 빠르게 다시 볼 수 있어요. 최대 5개까지 표시됩니다.' },
-    { question: '새 기록 추가', answer: '검색창에 원하는 주제를 입력하고 검색하면, 관련 기록을 추가할 수 있어요. 검색 결과에서 "추가" 버튼을 눌러주세요.' },
+    { question: '새 일기 추가하는 방법', answer: '메시지를 입력하고, 요약하기 버튼을 누르면 메시지를 요약하여 일기를 생성해줍니다! 히스토리에 넣기 버튼을 누르면 저장이 완료됩니다! (주의: 히스토리에 넣기 버튼을 누르지 않으면 저장되지 않습니다!)' },
+    { question: '추억을 검색하는 방법', answer: '입력창에 질문을 넣어보세요 !\n 예) 오늘 뭐했어? 어제 뭐 먹었더라? \n히스토리에 일기를 넣으면 AI가 자동으로 일기를 분석해서 답변해 줍니다!' },
   ];
   const sceneInitialized = useRef(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
@@ -340,28 +338,33 @@ export const LibrarianWidget: React.FC<LibrarianWidgetProps> = ({
           }}
         >
           {/* 헤더 */}
-          <div className="bg-amber-800 text-amber-100 px-4 py-3 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              {!showQuickReplies && (
-                <button 
-                  onClick={() => {
-                    setShowQuickReplies(true);
-                    setMessages([{ role: 'bot', text: '안녕하세요! 저는 도서관 사서입니다. 무엇을 도와드릴까요?' }]);
-                  }}
-                  className="hover:bg-amber-700 rounded p-1 transition-colors"
-                  title="처음으로"
-                >
-                  ←
-                </button>
-              )}
-              <span className="font-serif font-bold">📚 도서관 사서</span>
+          <div className="bg-amber-800 text-amber-100 px-4 py-3">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                {!showQuickReplies && (
+                  <button 
+                    onClick={() => {
+                      setShowQuickReplies(true);
+                      setMessages([{ role: 'bot', text: '안녕하세요! 저는 도서관 사서입니다. 무엇을 도와드릴까요?' }]);
+                    }}
+                    className="hover:bg-amber-700 rounded p-1 transition-colors"
+                    title="처음으로"
+                  >
+                    ←
+                  </button>
+                )}
+                <span className="font-serif font-bold">📚 도서관 사서</span>
+              </div>
+              <button 
+                onClick={() => setIsChatOpen(false)}
+                className="hover:bg-amber-700 rounded p-1 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
             </div>
-            <button 
-              onClick={() => setIsChatOpen(false)}
-              className="hover:bg-amber-700 rounded p-1 transition-colors"
-            >
-              <X className="w-4 h-4" />
-            </button>
+            <div className="text-xs text-amber-200 font-serif">
+              질문을 적어보세요! (ex: 오늘 뭐먹었어? 오늘 뭐했어? 등등)
+            </div>
           </div>
           
           {/* 메시지 영역 */}
